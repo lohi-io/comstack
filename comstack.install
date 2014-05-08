@@ -1,0 +1,28 @@
+<?php
+/**
+ * @file
+ * Provides installation details for Communications Stack.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function comstack_schema() {
+  $schema = array();
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function comstack_install() {
+
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function comstack_uninstall() {
+
+}

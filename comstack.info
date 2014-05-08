@@ -1,0 +1,6 @@
+name = Communications Stack
+description = Provides an API for communications.
+core = 7.x
+package = Communications Stack
+
+dependencies[] = ctools
