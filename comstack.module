@@ -3,3 +3,918 @@
  * @file
  * comstack.module
  */
+
+/**
+ * Flat messages don't belong to a thread/conversation.
+ */
+define('COMSTACK_TYPE_STRUCTURE_FLAT', 'flat');
+
+/**
+ * Messages that do belong to a conversation, part of a dialogue.
+ */
+define('COMSTACK_TYPE_STRUCTURE_CONVERSATION', 'conversation');
+
+/**
+ * Implements hook_permission().
+ */
+function comstack_permission() {
+  $permissions = array(
+    'administer comstack settings' => array(
+      'title' => t('Administer Communications stack settings'),
+      'description' => t('General permission for altering stack settings.'),
+      'restrict access' => TRUE,
+    ),
+    'administer comstack_message_types' => array(
+      'title' => t('Administer message types'),
+      'description' => t('Allows users to create, edit and delete Message types (bundles).'),
+      'restrict access' => TRUE,
+    ),
+    'administer comstack content' => array(
+      'title' => t('Administer Communications Stack content'),
+      'description' => t('Allows administration of all Conversations &amp; Messages sent via Communications Stack.'),
+      'restrict access' => TRUE,
+    ),
+    'view comstack messages' => array(
+      'title' => t('View Communications Stack messages'),
+      'description' => t("Catch all definition for viewing messages which don't have their own specific permissions."),
+    ),
+  );
+
+  // If any Message types allow for permissions then chuck em in.
+  // Otherwise it'll use the standard access checking method of:
+  // is user an admin, recipient or sender of a message.
+  // An example of a type which might want this could be "User Activity".
+  // Establishes permissions for the ops: view, create, reply, edit, delete.
+  $message_types = comstack_get_message_types();
+  if ($message_types) {
+    foreach ($message_types as $name => $message_type) {
+      // Overall permissions for the type.
+      if ($message_type->implement_perms) {
+        $permissions["view comstack $name messages"] = array(
+          'title' => t('View Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => t('Allows users to view messages of this type instead of using the standard access checking method.'),
+        );
+        $permissions["create comstack $name messages"] = array(
+          'title' => t('Create new Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => t('Allows users to create new messages of this type, depends on UI available.'),
+        );
+        $permissions["reply to comstack $name messages"] = array(
+          'title' => t('Reply to Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => t('Allows users to reply to messages of this type, only applies in conversation context.'),
+        );
+        $permissions["edit own comstack $name messages"] = array(
+          'title' => t('Edit own Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => NULL,
+        );
+        $permissions["edit any comstack $name messages"] = array(
+          'title' => t('Edit own Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => NULL,
+          'restrict access' => TRUE,
+        );
+        $permissions["delete own comstack $name messages"] = array(
+          'title' => t('Delete own Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => NULL,
+        );
+        $permissions["delete any comstack $name messages"] = array(
+          'title' => t('Delete own Communications Stack @label messages', array('@label' => $message_type->label)),
+          'description' => NULL,
+          'restrict access' => TRUE,
+        );
+      }
+
+      // Read receipt permission.
+      if ($message_type->record_read_receipts_perm) {
+        $permissions["allow opt out comstack $name read receipts"] = array(
+          'title' => t('Allow opt out of Communications Stack @label message read receipts', array('@label' => $message_type->label)),
+          'description' => NULL,
+        );
+      }
+    }
+  }
+
+  return $permissions;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function comstack_menu() {
+  $items = array();
+  $includes_dir = drupal_get_path('module', 'comstack') . '/includes';
+
+  // Administration menu items.
+  $items['admin/structure/comstack'] = array(
+    'title' => 'Communications Stack',
+    'description' => 'Manage the Communications Stack.',
+    'access arguments' => array('administer comstack settings'),
+    'page callback' => 'system_admin_menu_block_page',
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+    'weight' => -10,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+function comstack_entity_info() {
+  $entities = array();
+
+  $entities['comstack_message_type'] = array(
+    'label' => t('Message Type'),
+    'controller class' => 'EntityAPIControllerExportable',
+    'base table' => 'comstack_message_type',
+    'fieldable' => TRUE,
+    'bundle of' => 'comstack_message',
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'module' => 'comstack',
+    'admin ui' => array(
+      'path' => 'admin/structure/comstack/types',
+      'controller class' => 'ComstackMessageTypeUIController',
+    ),
+    'access callback' => 'comstack_message_type_access_callback',
+  );
+
+  $entities['comstack_message'] = array(
+    'label' => t('Message'),
+    'plural label' => t('Messages'),
+    'base table' => 'comstack_message',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'thread_id',
+      'bundle' => 'type',
+      'label' => 'title',
+    ),
+    'bundle keys' => array(
+      'bundle' => 'type',
+    ),
+    'bundles' => array(
+      // Supplied later.
+    ),
+    'load hook' => 'comstack_message_load',
+    'view modes' => array(
+      'full' => array(
+        'label' => t('Default'),
+        'custom settings' => FALSE,
+      ),
+    ),
+    'module' => 'harmony_core',
+    'access callback' => 'comstack_message_access_callback',
+  );
+
+  // Add bundle info but bypass entity_load() as we cannot use it here.
+  $types = db_select('comstack_message_type', 'cmt')
+    ->fields('cmt')
+    ->execute()
+    ->fetchAllAssoc('type');
+
+  foreach ($types as $type => $info) {
+    $entities['comstack_message']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/comstack/types/%comstack_message_type',
+        'real path' => 'admin/structure/comstack/types/' . $type,
+        'bundle argument' => 4,
+        'access arguments' => array('administer comstack settings'),
+      ),
+    );
+  }
+
+  return $entities;
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function comstack_entity_property_info() {
+  $info = array();
+
+  // Message type entity.
+  $message_type_properties = &$info['comstack_message_type']['properties'];
+  $message_type_properties = array();
+
+  // Conversation entity.
+  $conversation_properties = &$info['comstack_conversation']['properties'];
+
+  $conversation_properties['conversation_id'] = array(
+    'label' => t('Conversation ID'),
+    'type' => 'integer',
+    'description' => t('The unique conversation ID.'),
+  );
+  $conversation_properties['type'] = array(
+    'label' => t('Conversation/Message type'),
+    'type' => 'token',
+    'description' => t('The type of the conversation or message.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack_message_types',
+    'options list' => 'comstack_get_message_types_flat',
+    'required' => TRUE,
+    'schema field' => 'type',
+  );
+  $conversation_properties['entity_type'] = array(
+    'label' => t('Sender Entity Type'),
+    'type' => 'token',
+    'description' => t('The type of entity which started the conversation.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'required' => TRUE,
+    'schema field' => 'entity_type',
+  );
+  $conversation_properties['entity_id'] = array(
+    'label' => t('Sender Entity ID'),
+    'type' => 'integer',
+    'description' => t('The ID of the entity which started the conversation.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'required' => TRUE,
+    'schema field' => 'entity_id',
+  );
+  $conversation_properties['entity']  = array(
+    'label' => t('Sender Entity'),
+    'type' => 'entity',
+    'computed' => TRUE,
+    'getter callback' => 'comstack_conversation_get_entity',
+  );
+  $conversation_properties['started'] = array(
+    'label' => t('Date started'),
+    'type' => 'date',
+    'description' => t('The date the conversation was created.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'started',
+  );
+  $conversation_properties['updated'] = array(
+    'label' => t('Date last updated'),
+    'type' => 'date',
+    'description' => t('The date the conversation was most recently updated.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'updated',
+  );
+  $conversation_properties['title'] = array(
+    'label' => t('Title'),
+    'description' => t('The title of the conversation.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'title',
+  );
+  $conversation_properties['messages_count'] = array(
+    'label' => t('Messages count'),
+    'description' => t('Number of messages in the conversation.'),
+    'type' => 'integer',
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'messages_count',
+  );
+  $conversation_properties['pinned'] = array(
+    'label' => t('Pinned'),
+    'description' => t('Whether the conversation should be displayed at the top of lists in which it appears.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'pinned',
+    'type' => 'boolean',
+  );
+  $conversation_properties['deleted'] = array(
+    'label' => t('Deleted'),
+    'description' => t('Whether the conversation has been deleted.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'deleted',
+    'type' => 'boolean',
+  );
+
+  // Message entity.
+  $message_properties = &$info['comstack_message']['properties'];
+
+  $message_properties['message_id'] = array(
+    'label' => t('Message ID'),
+    'type' => 'integer',
+    'description' => t('The unique message ID.'),
+  );
+  $message_properties['type'] = array(
+    'label' => t('Conversation/Message type'),
+    'type' => 'token',
+    'description' => t('The type of the conversation or message.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack_message_types',
+    'options list' => 'comstack_get_message_types_flat',
+    'required' => TRUE,
+    'schema field' => 'type',
+  );
+  $message_properties['sender_entity_type'] = array(
+    'label' => t('Sender Entity Type'),
+    'type' => 'token',
+    'description' => t('The type of entity which sent the message.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'required' => TRUE,
+    'schema field' => 'sender_entity_type',
+  );
+  $message_properties['sender_entity_id'] = array(
+    'label' => t('Sender Entity ID'),
+    'type' => 'integer',
+    'description' => t('The ID of the entity which sent the message.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'required' => TRUE,
+    'schema field' => 'sender_entity_id',
+  );
+  $message_properties['sender_entity']  = array(
+    'label' => t('Sender Entity'),
+    'type' => 'entity',
+    'computed' => TRUE,
+    'getter callback' => 'comstack_conversation_get_sender',
+  );
+  $message_properties['entity_type'] = array(
+    'label' => t('Destination Entity Type'),
+    'type' => 'token',
+    'description' => t('The type of destination entity.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'required' => TRUE,
+    'schema field' => 'entity_type',
+  );
+  $message_properties['entity_id'] = array(
+    'label' => t('Destination Entity ID'),
+    'type' => 'integer',
+    'description' => t('The ID of the destination entity.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'required' => TRUE,
+    'schema field' => 'entity_id',
+  );
+  $message_properties['entity']  = array(
+    'label' => t('Sender Entity'),
+    'type' => 'entity',
+    'computed' => TRUE,
+    'getter callback' => 'comstack_conversation_get_entity',
+  );
+  $message_properties['sent'] = array(
+    'label' => t('Date sent'),
+    'type' => 'date',
+    'description' => t('The date the message was sent.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'sent',
+  );
+  $message_properties['subject'] = array(
+    'label' => t('Subject'),
+    'description' => t('The message subject.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'subject',
+  );
+  $message_properties['text'] = array(
+    'label' => t('Text'),
+    'description' => t('Message text.'),
+    'type' => 'text',
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'subject',
+  );
+  // No entries for text_replacements or actions properties.
+  $message_properties['all_have_read'] = array(
+    'label' => t('All have read'),
+    'description' => t('Whether this message has been read by all recipients.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'all_have_read',
+    'type' => 'boolean',
+  );
+  $message_properties['read_by_updated'] = array(
+    'label' => t('Date sent'),
+    'type' => 'date',
+    'description' => t('Timestamp when the read by meta info was last updated.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'read_by_updated',
+  );
+  $message_properties['pinned'] = array(
+    'label' => t('Pinned'),
+    'description' => t('Whether the message should be displayed at the top of lists in which it appears.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'pinned',
+    'type' => 'boolean',
+  );
+  $message_properties['deleted'] = array(
+    'label' => t('Deleted'),
+    'description' => t('Whether the message has been deleted.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack content',
+    'schema field' => 'deleted',
+    'type' => 'boolean',
+  );
+
+  return $info;
+}
+
+/**
+ * Custom entity getter callback used from metadata info.
+ */
+function comstack_conversation_get_entity($data, array $options, $name, $type, $info) {
+  return entity_load_single($data->entity_type, $data->entity_id);
+}
+
+/**
+ * Custom entity getter callback used from metadata info.
+ */
+function comstack_conversation_get_sender($data, array $options, $name, $type, $info) {
+  return entity_load_single($data->sender_entity_type, $data->sender_entity_id);
+}
+
+/**
+ * Implements hook_ctools_plugin_type().
+ */
+function comstack_ctools_plugin_type() {
+  return array(
+    'delivery_methods' => array(
+      'use hooks' => TRUE,
+    ),
+    'destinations' => array(
+      'use hooks' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function comstack_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'comstack' && in_array($plugin_type, array('delivery_methods', 'destinations'))) {
+    return "plugins/$plugin_type";
+  }
+}
+
+/* Base functions for messing with Comstack ctools plugins. */
+
+/**
+ * Get Comstack plugins of a specific type.
+ */
+function comstack_get_plugins($type) {
+  $types = &drupal_static(__FUNCTION__);
+
+  if (!isset($types[$type])) {
+    $types[$type] = array();
+
+    ctools_include('context');
+    ctools_include('plugins');
+    $plugins = ctools_get_plugins('comstack', $type);
+
+    // Sort em.
+    if ($plugins) {
+      uasort($plugins, function($a, $b) {
+        return $a['weight'] - $b['weight'];
+      });
+    }
+
+    $types[$type] = $plugins;
+  }
+
+  return $types[$type];
+}
+
+/**
+ * Get a plugin type as a flat array.
+ */
+function comstack_get_plugins_flat($type) {
+  $types = comstack_get_plugins($type);
+  $types_flat = array();
+
+  if (!empty($types)) {
+    foreach ($types as $id => $plugin) {
+      $types_flat[$id] = $plugin['title'];
+    }
+  }
+
+  return $types_flat;
+}
+
+/* Plugin based stuff. */
+
+/**
+ * Function to grab all available delivery methods.
+ */
+function comstack_get_delivery_methods() {
+  return comstack_get_plugins('delivery_methods');
+}
+
+/**
+ * Grab an array of delivery methods with id as the index and label as
+ * the value.
+ */
+function comstack_get_delivery_methods_flat() {
+  return comstack_get_plugins_flat('delivery_methods');
+}
+
+/**
+ * Grab a specific delivery method.
+ */
+function comstack_get_delivery_method($id) {
+  $plugins = comstack_get_plugins('delivery_methods');
+  return !empty($plugins[$id]) ? $plugins[$id] : NULL;
+}
+
+/**
+ * Function to grab all available destinations.
+ */
+function comstack_get_destinations() {
+  return comstack_get_plugins('destinations');
+}
+
+/**
+ * Grab an array of destinations with id as the index and label as
+ * the value.
+ */
+function comstack_get_destinations_flat() {
+  return comstack_get_plugins_flat('destinations');
+}
+
+/**
+ * Grab a specific destinations.
+ */
+function comstack_get_destination($id) {
+  $plugins = comstack_get_plugins('destinations');
+  return !empty($plugins[$id]) ? $plugins[$id] : NULL;
+}
+
+/**
+ * Message type Entity functions.
+ */
+
+/**
+ * Message type entity access callback.
+ */
+function comstack_message_type_access_callback($op, $entity = NULL, $account = NULL) {
+  return user_access('administer comstack_message_types', $account);
+}
+
+/**
+ * Return a list of message types in an array, whole objects.
+ */
+function comstack_get_message_types($type_name = NULL) {
+  $types = entity_load_multiple_by_name('comstack_message_type', isset($type_name) ? array($type_name) : FALSE);
+
+  return isset($type_name) ? reset($types) : $types;
+}
+
+/**
+ * Function to return a flat array of message types. Will be used
+ * in entity_metadata info and therefore views also.
+ */
+function comstack_get_message_types_flat() {
+  $types = comstack_get_message_types();
+
+  if (!empty($types)) {
+    $flat_types = array();
+    foreach ($types as $type => $info) {
+      $flat_types[$type] = $info->label;
+    }
+
+    return $flat_types;
+  }
+  else {
+    return array();
+  }
+}
+
+/* Entity CRUD functions. */
+
+/**
+ * Menu argument loader; Load a message type by string.
+ *
+ * @param $type
+ *   The machine-readable name of a message type to load.
+ * @return
+ *   A message type array or FALSE if $type does not exist.
+ */
+function comstack_message_type_load($type) {
+  return comstack_get_message_types($type);
+}
+
+/**
+ * Entity load function.
+ */
+function comstack_message_load($message_id, $reset = FALSE) {
+  $messages = comstack_message_load_multiple(array($message_id), array(), $reset);
+  return reset($messages);
+}
+
+/**
+ * Load multiple messages based on certain conditions.
+ */
+function comstack_message_load_multiple($message_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('comstack_message', $message_ids, $conditions, $reset);
+}
+
+/**
+ * Form building function which provides the add/edit form for
+ * the comstack_message_type entity.
+ */
+function comstack_message_type_form($form, &$form_state, $comstack_message_type, $op = 'edit', $entity_type = NULL) {
+  if ($op === 'clone') {
+    $comstack_message_type->label .= ' (cloned)';
+    $comstack_message_type->type = $entity_type . '_clone';
+  }
+
+  // Check for existing content.
+  $content_count = 0;
+  if ($op != 'add' && $op != 'clone') {
+    $content_count = db_query('SELECT COUNT(*) FROM {comstack_message} WHERE type = :type', array(':type' => $comstack_message_type->type))->fetchField();
+
+    if ($content_count > 0) {
+      $form['existing_content'] = array('#markup' => t('<p><strong>Note:</strong> You cannot delete this type as messages of this type exist. Please remove the content first.</p>'));
+    }
+  }
+
+  $form['label'] = array(
+    '#title' => t('Label'),
+    '#type' => 'textfield',
+    '#required' => TRUE,
+    '#default_value' => isset($comstack_message_type->label) ? $comstack_message_type->label : '',
+  );
+
+  // Machine-readable type name.
+  $form['type'] = array(
+    '#type' => 'machine_name',
+    '#default_value' => isset($comstack_message_type->type) ? $comstack_message_type->type : '',
+    '#machine_name' => array(
+      'exists' => 'comstack_get_message_types',
+      'source' => array('label'),
+    ),
+    '#description' => t('A unique machine-readable name for this thread type. It must only contain lowercase letters, numbers, and underscores.'),
+  );
+
+  $destinations = comstack_get_destinations_flat();
+
+  $form['destination_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Destination type'),
+    '#options' => $destinations,
+    '#default_value' => isset($comstack_message_type->destination_type) ? $comstack_message_type->destination_type : '',
+    '#required' => TRUE,
+  );
+
+  $form['destination_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('User destination specific settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-destination-type"]' => array('value' => 'user'),
+      ),
+    ),
+  );
+
+  $form['destination_settings']['structure'] = array(
+    '#title' => t('Type structure'),
+    '#type' => 'select',
+    '#options' => array(
+      COMSTACK_TYPE_STRUCTURE_FLAT => t('Flat'),
+      COMSTACK_TYPE_STRUCTURE_CONVERSATION => t('Conversation'),
+    ),
+    '#default_value' => isset($comstack_message_type->structure) ? $comstack_message_type->structure : COMSTACK_TYPE_STRUCTURE_FLAT,
+    '#description' => t("The type structure, Flat would constitute single messages that don't represent an ongoing dialogue. Conversation structure is the opposite, in addition to message entities conversation entities are created to wrapper and collect messages within."),
+  );
+
+  $form['destination_settings']['user_preferences'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow user preferences for this message type'),
+    '#default_value' => isset($comstack_message_type->user_preferences) ? $comstack_message_type->user_preferences : 0,
+    '#description' => t('This option will allow users to select which delivery methods they get messages of this type by (from the chosen set in this form).'),
+  );
+
+  $form['destination_settings']['implement_perms'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Implement specific permissions for messages of this type'),
+    '#default_value' => isset($comstack_message_type->implement_perms) ? $comstack_message_type->implement_perms : 0,
+    '#description' => t('Check to provide CRUD type permissions for interacting with conversations (if the structure is set so) and/or messages of this type.'),
+  );
+
+  $delivery_methods = comstack_get_delivery_methods_flat();
+
+  $form['delivery_methods'] = array(
+    '#title' => t('Delivery methods to allow'),
+    '#type' => 'checkboxes',
+    '#required' => TRUE,
+    '#options' => $delivery_methods,
+    '#default_value' => isset($comstack_message_type->delivery_methods) ? $comstack_message_type->delivery_methods : array(),
+    '#tree' => TRUE,
+  );
+
+  $form['store_last_read_time'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Store last read time'),
+    '#default_value' => isset($comstack_message_type->store_last_read_time) ? $comstack_message_type->store_last_read_time : 0,
+    '#description' => t('If checked message metadata will be updated storing read information.'),
+  );
+
+  $form['record_read_receipts'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Record read receipts'),
+    '#default_value' => isset($comstack_message_type->record_read_receipts) ? $comstack_message_type->record_read_receipts : 0,
+    '#description' => t('If checked detailed records of who has read a message and when will be kept. This allows for "Read at xx:xx" inline information.'),
+  );
+
+  $form['record_read_receipts_fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Grouping settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-record-read-receipts"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['record_read_receipts_perm'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Provide read receipts permissions'),
+    '#default_value' => isset($comstack_message_type->record_read_receipts_perm) ? $comstack_message_type->record_read_receipts_perm : 0,
+    '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
+  );
+
+  $form['record_read_receipts_default'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable read receipts by default?'),
+    '#default_value' => isset($comstack_message_type->record_read_receipts_default) ? $comstack_message_type->record_read_receipts_default : 1,
+    '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
+  );
+
+  $form['grouping'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Group messages of this type'),
+    '#default_value' => isset($comstack_message_type->grouping) ? $comstack_message_type->grouping : 0,
+    '#description' => t('Check if the messages in this type can be grouped together, e.g. Notifications type with the groups: Photo, Note, Comment reply.'),
+  );
+
+  $form['grouping_fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Grouping settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-grouping"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['grouping_fieldset']['delivery_methods_per_grouping'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow delivery methods per grouping?'),
+    '#default_value' => isset($comstack_message_type->delivery_methods_per_grouping) ? $comstack_message_type->delivery_methods_per_grouping : 0,
+    '#description' => t('Check to enable the definition of which delivery methods are used per grouping.'),
+  );
+
+  $form['grouping_fieldset']['groups'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Groups'),
+    '#options' => array(),
+    '#default_value' => isset($comstack_message_type->groups) ? $comstack_message_type->groups : array(),
+    '#tree' => TRUE,
+  );
+
+  $form['subject'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Subjects'),
+    '#default_value' => isset($comstack_message_type->subject) ? $comstack_message_type->subject : 0,
+    '#description' => t('Check if the messages in this type can be have a subject.'),
+  );
+
+  $form['template'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Messages of this type should follow a template'),
+    '#default_value' => isset($comstack_message_type->template) ? $comstack_message_type->template : 0,
+    '#description' => t('Check if a structured text template should be used, left unchecked the messages shall be free-form/text.'),
+  );
+
+  $form['template_text'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Template text'),
+    '#default_value' => isset($comstack_message_type->template_text) ? $comstack_message_type->template_text : '',
+    '#description' => t('Template follows Drupal t() conventions... should be tokens really'),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-template"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['actions'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable actions'),
+    '#default_value' => isset($comstack_message_type->actions) ? $comstack_message_type->actions : 0,
+    '#description' => t('When enabled actions will be requested via a hook per message, e.g. Dimiss, Reply.'),
+  );
+
+  $form['flood_control'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable flood control'),
+    '#default_value' => isset($comstack_message_type->flood_control) ? $comstack_message_type->flood_control : 0,
+    '#description' => t('Enable flood control to rate limit the number of messages of this type that can be sent per user.'),
+  );
+
+  $form['flood'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Flood settings'),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-flood-control"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['flood']['flood_control_interval'] = array(
+    '#title' => t('Time interval'),
+    '#type' => 'select',
+    '#options' => drupal_map_assoc(array(60, 180, 300, 600, 900, 1800, 2700, 3600, 10800, 21600, 32400, 43200, 86400), 'format_interval'),
+    '#default_value' => isset($comstack_message_type->flood_control_interval) ? $comstack_message_type->flood_control_interval : 3600,
+  );
+
+  $form['flood']['flood_control_limit'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Maximum number of reports allowed within the interval'),
+    '#required' => TRUE,
+    '#default_value' => isset($comstack_message_type->flood_control_limit) ? $comstack_message_type->flood_control_limit : 50,
+    '#element_validate' => array(
+      'element_validate_integer_positive',
+    ),
+  );
+
+  $form['defer_send_to_cron_queue'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Messages should be added to a queue which will be processed on Cron'),
+    '#default_value' => isset($comstack_message_type->defer_send_to_cron_queue) ? $comstack_message_type->defer_send_to_cron_queue : 0,
+    '#description' => t("Processing via Cron, whilst slower could be more performant if you're expecting to send a large volume of messages. If unchecked messages are sent instantly."),
+  );
+
+  $form['cron_purge_active'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Purge read messages of this type via Cron'),
+    '#default_value' => isset($comstack_message_type->cron_purge_active) ? $comstack_message_type->cron_purge_active : 0,
+    '#description' => t('This functionality requires that Cron is configured correctly.'),
+  );
+
+  $form['cron_purge'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Message purge settings'),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-cron-purge-active"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['cron_purge']['cron_purge_interval'] = array(
+    '#title' => t('Time interval'),
+    '#type' => 'select',
+    '#options' => drupal_map_assoc(array(3600, 10800, 21600, 32400, 43200, 86400, 259200, 432000, 604800, 1209600, 2592000), 'format_interval'),
+    '#default_value' => isset($comstack_message_type->cron_purge_interval) ? $comstack_message_type->cron_purge_interval : 604800,
+  );
+
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save message type'),
+    '#weight' => 40,
+  );
+
+  if ($op != 'add' && $op != 'clone' && $content_count < 1) {
+    $form['actions']['delete'] = array(
+      '#type' => 'submit',
+      '#value' => t('Delete message type'),
+      '#weight' => 45,
+      '#limit_validation_errors' => array(),
+      '#submit' => array('comstack_message_type_form_submit_delete')
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Form API submit callback for the type form.
+ */
+function comstack_message_type_form_submit(&$form, &$form_state) {
+  $comstack_message_type = entity_ui_form_submit_build_entity($form, $form_state);
+
+  // Save the entity!
+  entity_save('comstack_message_type', $comstack_message_type);
+
+  // Redirect the user.
+  $form_state['redirect'] = 'admin/structure/comstack/types';
+}
+
+/**
+ * Form API submit callback for the delete button.
+ */
+function comstack_message_type_form_submit_delete(&$form, &$form_state) {
+  $form_state['redirect'] = 'admin/structure/comstack/types/' . $form_state['comstack_message_type']->type . '/delete';
+}

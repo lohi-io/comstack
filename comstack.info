@@ -1,6 +1,10 @@
-name = Communications Stack
+name = Communications Stack (comstack)
 description = Provides an API for communications.
 core = 7.x
 package = Communications Stack
+php = 5.3
 
 dependencies[] = ctools
+dependencies[] = views
+
+files[] = includes/comstack.controllers.inc
