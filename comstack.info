@@ -5,6 +5,13 @@ package = Communications Stack
 php = 5.3
 
 dependencies[] = ctools
+dependencies[] = entity
 dependencies[] = views
 
-files[] = includes/comstack.controllers.inc
+; Includes
+files[] = includes/ComstackControllers.php
+files[] = includes/ComstackPluginInterface.php
+files[] = includes/ComstackPluginBase.php
+
+; Plugins
+files[] = plugins/delivery_methods/ComstackDeliveryMethodInterface.php
