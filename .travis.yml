@@ -104,7 +104,8 @@ before_script:
 
 script:
   # Run the Behat tests.
-  echo ./bin/behat -dl
+  - BEHAT=`./bin/behat -dl`
+  - echo $BEHAT
 
 notifications:
   email:
