@@ -25,7 +25,7 @@ function comstack_entity_info() {
     'module' => 'comstack',
     'admin ui' => array(
       'path' => 'admin/structure/comstack/types',
-      'controller class' => 'ComstackMessageTypeUIController',
+      'controller class' => 'ComstackEntityUIController',
     ),
     'access callback' => 'comstack_message_type_access_callback',
   );
@@ -53,7 +53,7 @@ function comstack_entity_info() {
         'custom settings' => FALSE,
       ),
     ),
-    'module' => 'harmony_core',
+    'module' => 'comstack',
     'access callback' => 'comstack_message_access_callback',
   );
 

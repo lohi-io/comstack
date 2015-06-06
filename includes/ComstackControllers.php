@@ -2,14 +2,14 @@
 
 /**
  * @file
- * Contains ComstackControllers ComstackMessageTypeUIController
+ * Contains ComstackControllers ComstackEntityUIController
  */
 
 /**
- * ComstackMessageTypeUIController
+ * ComstackEntityUIController
  * Message Type Entity.
  */
-class ComstackMessageTypeUIController extends EntityDefaultUIController {
+class ComstackEntityUIController extends EntityDefaultUIController {
   /**
    * Generates the row for the passed entity and may be overridden in order to
    * customize the rows.

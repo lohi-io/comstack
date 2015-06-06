@@ -85,12 +85,19 @@ function comstack_schema() {
         'size' => 'tiny',
         'boolean' => TRUE,
       ),
+      'input_methods' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of allowed input methods for this type.',
+      ),
       'delivery_methods' => array(
         'type' => 'text',
         'not null' => FALSE,
         'size' => 'big',
         'serialize' => TRUE,
-        'description' => 'A serialized array of allowed send methods for this type.',
+        'description' => 'A serialized array of allowed delivery methods for this type.',
       ),
       'grouping' => array(
         'description' => 'Boolean indicating whether the messages in this type can be grouped together, e.g. Notifications with the groups: Photo, Note, Comment reply.',
@@ -246,6 +253,13 @@ function comstack_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'container' => array(
+        'description' => 'The machine name of the container e.g. Folder this conversation lives in.',
+        'type' => 'varchar',
+        'length' => '128',
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'started' => array(
         'description' => 'The Unix timestamp when the message was started.',
         'type' => 'int',
@@ -259,7 +273,7 @@ function comstack_schema() {
         'default' => 0,
       ),
       'title' => array(
-        'description' => 'The title or name of the conversation.',
+        'description' => 'The title, subject or name of the conversation.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -308,7 +322,7 @@ function comstack_schema() {
   );
 
   $schema['comstack_conversation_entity'] = array(
-    'description' => 'Data store for linkage between a conversation and the recipients read state.',
+    'description' => 'Linkage between a conversation and the recipients read state/participation. Simplest example would be user entity.',
     'fields' => array(
       'ceid' => array(
         'description' => 'The primary identifier for this record.',
@@ -317,7 +331,7 @@ function comstack_schema() {
         'not null' => TRUE,
       ),
       'conversation_id' => array(
-        'description' => 'The ID of the conversation the user is a part of.',
+        'description' => 'The ID of the conversation the entity (typically user) is a part of.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -344,8 +358,24 @@ function comstack_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'delivered' => array(
+        'description' => 'Boolean indicating whether the most recent message(s) have been delivered this conversation participant.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
       'muted' => array(
         'description' => 'Boolean indicating whether updates in this conversation should alert the destination entity.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+      'forwarded' => array(
+        'description' => 'Boolean indicating whether this conversation has been forwarded by the participant entity.',
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
@@ -368,8 +398,60 @@ function comstack_schema() {
     'primary key' => array('ceid'),
   );
 
+  $schema['comstack_conversation_message'] = array(
+    'description' => 'Storage for when a message type requires that a conversation keeps separate histories for each participant.',
+    'fields' => array(
+      'ccmid' => array(
+        'description' => 'The primary identifier for this record.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'conversation_id' => array(
+        'description' => 'The ID of the conversation the entity (typically user) is a part of.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'message_id' => array(
+        'description' => 'The ID of the message that has been read.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'deleted' => array(
+        'description' => 'Boolean indicating whether this conversation is marked as deleted.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+    ),
+    'indexes' => array(
+      'conversation_id' => array('conversation_id'),
+      'entity_type' => array('entity_type'),
+      'entity_id' => array('entity_id'),
+      'unread_count' => array('unread_count'),
+    ),
+    'foreign keys' => array(
+      'conversation' => array(
+        'table' => 'comstack_conversation',
+        'columns' => array('conversation_id' => 'conversation_id'),
+      ),
+      'message' => array(
+        'table' => 'comstack_message',
+        'columns' => array('message_id' => 'message_id'),
+      ),
+    ),
+    'primary key' => array('ccmid'),
+  );
+
+  // This could be an implementation of comstack itself, templated text.
   $schema['comstack_conversation_event'] = array(
-    'description' => 'Data store for events that happen in a conversation, e.g. A user was added to the conversation.',
+    'description' => 'Events that happen in a conversation, e.g. A user was added to the conversation.',
     'fields' => array(
       'conversation_event_id' => array(
         'description' => 'The primary identifier for this record.',
@@ -458,7 +540,7 @@ function comstack_schema() {
         'default' => -1,
       ),
       'entity_type' => array(
-        'description' => 'The sender entity type, such as one of "node", "comment", or "user".',
+        'description' => 'The destination entity type, such as one of "node", "comment", or "user".',
         'type' => 'varchar',
         'length' => '128',
         'not null' => TRUE,
@@ -483,6 +565,13 @@ function comstack_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'title' => array(
+        'description' => 'The title or name of the conversation.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'text' => array(
         'type' => 'text',
         'not null' => FALSE,
@@ -502,6 +591,14 @@ function comstack_schema() {
         'size' => 'big',
         'serialize' => TRUE,
         'description' => 'A serialized array of actions to perform if allowed by the type.',
+      ),
+      'delivered' => array(
+        'description' => 'Boolean indicating whether this message has been delivered to all recipients.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
       ),
       'all_have_read' => array(
         'description' => 'Boolean indicating whether this message has been read by all recipients.',
@@ -650,5 +747,5 @@ function comstack_install() {
  * Implements hook_uninstall().
  */
 function comstack_uninstall() {
-
+  variable_del('comstack_killswitch');
 }
