@@ -3,6 +3,7 @@ Feature: Admin type listing
   As an admin user
   View the listing of message types
 
+  @api
   Scenario: View the listing of message types
     Given I am logged in as a user with the "administrator" role
     When I go to "/admin/structure/comstack/types"
