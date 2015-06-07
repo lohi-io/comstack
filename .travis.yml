@@ -71,11 +71,8 @@ before_script:
   # Jump back into the install.
   - cd drupal/drupal
 
-  # Enable harmony_core.
-  - drush en -y comstack
-
-  # Enable some more modules.
-  #- drush en -y harmony_default_permissions harmony_default_input_format harmony_atjs
+  # Enable comstack and default permissions module.
+  - drush en -y comstack comstack_default_permissions
 
   # Setup files.
   - sudo chmod -R 777 sites/all
