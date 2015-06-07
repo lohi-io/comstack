@@ -432,9 +432,7 @@ function comstack_schema() {
     ),
     'indexes' => array(
       'conversation_id' => array('conversation_id'),
-      'entity_type' => array('entity_type'),
-      'entity_id' => array('entity_id'),
-      'unread_count' => array('unread_count'),
+      'message_id' => array('message_id'),
     ),
     'foreign keys' => array(
       'conversation' => array(
