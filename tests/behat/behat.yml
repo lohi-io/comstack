@@ -18,4 +18,4 @@ default:
       api_driver: "drupal"
       # We set the following via the travis install script, finding and replacing.
       drupal:
-        drupal_root: "DRUPALROOT"
+        drupal_root: "/home/travis/build/drupal/drupal"
