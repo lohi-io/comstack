@@ -25,7 +25,6 @@ function comstack_entity_info() {
     'module' => 'comstack',
     'admin ui' => array(
       'path' => 'admin/structure/comstack/types',
-      'controller class' => 'ComstackEntityUIController',
       // Weird load callback name thanks to hook_ENTITY_load, and the name
       // colliding with "comstack_message_type_load" from message_type_load.
       'menu wildcard' => '%_comstack_message_type',

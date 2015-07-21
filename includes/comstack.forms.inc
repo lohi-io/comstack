@@ -363,7 +363,7 @@ function comstack_message_type_form_submit(&$form, &$form_state) {
  * Form API submit callback for the delete button.
  */
 function comstack_message_type_form_submit_delete(&$form, &$form_state) {
-  $form_state['redirect'] = 'admin/structure/comstack/types/' . $form_state['comstack_message_type']->type . '/delete';
+  $form_state['redirect'] = 'admin/structure/comstack/types/manage/' . $form_state['comstack_message_type']->type . '/delete';
 }
 
 /**

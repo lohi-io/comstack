@@ -10,9 +10,8 @@ dependencies[] = message
 dependencies[] = views
 
 ; Includes
-files[] = includes/ComstackControllers.php
-;files[] = includes/ComstackPluginInterface.php
-;files[] = includes/ComstackPluginBase.php
+files[] = includes/ComstackPluginInterface.php
+files[] = includes/ComstackPluginBase.php
 
 ; Plugins
 files[] = plugins/entityreference/selection/ComstackRecipientSelectionPlugin.class.php
