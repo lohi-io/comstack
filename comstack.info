@@ -6,12 +6,14 @@ php = 5.3
 
 dependencies[] = ctools
 dependencies[] = entity
+dependencies[] = message
 dependencies[] = views
 
 ; Includes
 files[] = includes/ComstackControllers.php
-files[] = includes/ComstackPluginInterface.php
-files[] = includes/ComstackPluginBase.php
+;files[] = includes/ComstackPluginInterface.php
+;files[] = includes/ComstackPluginBase.php
 
 ; Plugins
-files[] = plugins/delivery_methods/ComstackDeliveryMethodInterface.php
+files[] = plugins/entityreference/selection/ComstackRecipientSelectionPlugin.class.php
+;files[] = plugins/delivery_methods/ComstackDeliveryMethodInterface.php

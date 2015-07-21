@@ -15,7 +15,7 @@ function comstack_entity_info() {
     'controller class' => 'EntityAPIControllerExportable',
     'base table' => 'comstack_message_type',
     'fieldable' => TRUE,
-    'bundle of' => 'comstack_message',
+    //'bundle of' => 'comstack_message',
     'exportable' => TRUE,
     'entity keys' => array(
       'id' => 'id',
@@ -26,292 +26,44 @@ function comstack_entity_info() {
     'admin ui' => array(
       'path' => 'admin/structure/comstack/types',
       'controller class' => 'ComstackEntityUIController',
+      // Weird load callback name thanks to hook_ENTITY_load, and the name
+      // colliding with "comstack_message_type_load" from message_type_load.
+      'menu wildcard' => '%_comstack_message_type',
     ),
     'access callback' => 'comstack_message_type_access_callback',
   );
-
-  $entities['comstack_message'] = array(
-    'label' => t('Message'),
-    'plural label' => t('Messages'),
-    'base table' => 'comstack_message',
-    'fieldable' => TRUE,
-    'entity keys' => array(
-      'id' => 'thread_id',
-      'bundle' => 'type',
-      'label' => 'title',
-    ),
-    'bundle keys' => array(
-      'bundle' => 'type',
-    ),
-    'bundles' => array(
-      // Supplied later.
-    ),
-    'load hook' => 'comstack_message_load',
-    'view modes' => array(
-      'full' => array(
-        'label' => t('Default'),
-        'custom settings' => FALSE,
-      ),
-    ),
-    'module' => 'comstack',
-    'access callback' => 'comstack_message_access_callback',
-  );
-
-  // Add bundle info but bypass entity_load() as we cannot use it here.
-  $types = db_select('comstack_message_type', 'cmt')
-    ->fields('cmt')
-    ->execute()
-    ->fetchAllAssoc('type');
-
-  foreach ($types as $type => $info) {
-    $entities['comstack_message']['bundles'][$type] = array(
-      'label' => $info->label,
-      'admin' => array(
-        'path' => 'admin/structure/comstack/types/%comstack_message_type',
-        'real path' => 'admin/structure/comstack/types/' . $type,
-        'bundle argument' => 4,
-        'access arguments' => array('administer comstack settings'),
-      ),
-    );
-  }
 
   return $entities;
 }
 
 /**
- * Implements hook_entity_property_info().
+ * Implements hook_entity_property_info_alter().
  */
-function comstack_entity_property_info() {
-  $info = array();
-
+function comstack_entity_property_info_alter(&$info) {
   // Message type entity.
   $message_type_properties = &$info['comstack_message_type']['properties'];
   $message_type_properties = array();
 
-  // Conversation entity.
-  $conversation_properties = &$info['comstack_conversation']['properties'];
-
-  $conversation_properties['conversation_id'] = array(
-    'label' => t('Conversation ID'),
-    'type' => 'integer',
-    'description' => t('The unique conversation ID.'),
-  );
-  $conversation_properties['type'] = array(
-    'label' => t('Conversation/Message type'),
-    'type' => 'token',
-    'description' => t('The type of the conversation or message.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack_message_types',
-    'options list' => 'comstack_get_message_types_flat',
-    'required' => TRUE,
-    'schema field' => 'type',
-  );
-  $conversation_properties['entity_type'] = array(
-    'label' => t('Sender Entity Type'),
-    'type' => 'token',
-    'description' => t('The type of entity which started the conversation.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'required' => TRUE,
-    'schema field' => 'entity_type',
-  );
-  $conversation_properties['entity_id'] = array(
-    'label' => t('Sender Entity ID'),
-    'type' => 'integer',
-    'description' => t('The ID of the entity which started the conversation.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'required' => TRUE,
-    'schema field' => 'entity_id',
-  );
-  $conversation_properties['entity']  = array(
-    'label' => t('Sender Entity'),
-    'type' => 'entity',
-    'computed' => TRUE,
-    'getter callback' => 'comstack_conversation_get_entity',
-  );
-  $conversation_properties['started'] = array(
-    'label' => t('Date started'),
-    'type' => 'date',
-    'description' => t('The date the conversation was created.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'started',
-  );
-  $conversation_properties['updated'] = array(
-    'label' => t('Date last updated'),
-    'type' => 'date',
-    'description' => t('The date the conversation was most recently updated.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'updated',
-  );
-  $conversation_properties['title'] = array(
-    'label' => t('Title'),
-    'description' => t('The title of the conversation.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'schema field' => 'title',
-  );
-  $conversation_properties['messages_count'] = array(
-    'label' => t('Messages count'),
-    'description' => t('Number of messages in the conversation.'),
-    'type' => 'integer',
-    'setter callback' => 'entity_property_verbatim_set',
-    'schema field' => 'messages_count',
-  );
-  $conversation_properties['pinned'] = array(
-    'label' => t('Pinned'),
-    'description' => t('Whether the conversation should be displayed at the top of lists in which it appears.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'pinned',
-    'type' => 'boolean',
-  );
-  $conversation_properties['deleted'] = array(
-    'label' => t('Deleted'),
-    'description' => t('Whether the conversation has been deleted.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'deleted',
-    'type' => 'boolean',
-  );
-
   // Message entity.
-  $message_properties = &$info['comstack_message']['properties'];
-
-  $message_properties['message_id'] = array(
-    'label' => t('Message ID'),
-    'type' => 'integer',
-    'description' => t('The unique message ID.'),
-  );
-  $message_properties['type'] = array(
-    'label' => t('Conversation/Message type'),
-    'type' => 'token',
-    'description' => t('The type of the conversation or message.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack_message_types',
-    'options list' => 'comstack_get_message_types_flat',
-    'required' => TRUE,
-    'schema field' => 'type',
-  );
-  $message_properties['sender_entity_type'] = array(
-    'label' => t('Sender Entity Type'),
-    'type' => 'token',
-    'description' => t('The type of entity which sent the message.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'required' => TRUE,
-    'schema field' => 'sender_entity_type',
-  );
-  $message_properties['sender_entity_id'] = array(
-    'label' => t('Sender Entity ID'),
-    'type' => 'integer',
-    'description' => t('The ID of the entity which sent the message.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'required' => TRUE,
-    'schema field' => 'sender_entity_id',
-  );
-  $message_properties['sender_entity']  = array(
-    'label' => t('Sender Entity'),
-    'type' => 'entity',
-    'computed' => TRUE,
-    'getter callback' => 'comstack_conversation_get_sender',
-  );
-  $message_properties['entity_type'] = array(
-    'label' => t('Destination Entity Type'),
-    'type' => 'token',
-    'description' => t('The type of destination entity.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'required' => TRUE,
-    'schema field' => 'entity_type',
-  );
-  $message_properties['entity_id'] = array(
-    'label' => t('Destination Entity ID'),
-    'type' => 'integer',
-    'description' => t('The ID of the destination entity.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'required' => TRUE,
-    'schema field' => 'entity_id',
-  );
-  $message_properties['entity']  = array(
-    'label' => t('Sender Entity'),
-    'type' => 'entity',
-    'computed' => TRUE,
-    'getter callback' => 'comstack_conversation_get_entity',
-  );
-  $message_properties['sent'] = array(
-    'label' => t('Date sent'),
-    'type' => 'date',
-    'description' => t('The date the message was sent.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'sent',
-  );
-  $message_properties['subject'] = array(
-    'label' => t('Subject'),
-    'description' => t('The message subject.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'schema field' => 'subject',
-  );
-  $message_properties['text'] = array(
-    'label' => t('Text'),
-    'description' => t('Message text.'),
-    'type' => 'text',
-    'setter callback' => 'entity_property_verbatim_set',
-    'schema field' => 'subject',
-  );
-  // No entries for text_replacements or actions properties.
-  $message_properties['all_have_read'] = array(
-    'label' => t('All have read'),
-    'description' => t('Whether this message has been read by all recipients.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'all_have_read',
-    'type' => 'boolean',
-  );
-  $message_properties['read_by_updated'] = array(
-    'label' => t('Date sent'),
-    'type' => 'date',
-    'description' => t('Timestamp when the read by meta info was last updated.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'read_by_updated',
-  );
-  $message_properties['pinned'] = array(
-    'label' => t('Pinned'),
-    'description' => t('Whether the message should be displayed at the top of lists in which it appears.'),
-    'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
-    'schema field' => 'pinned',
-    'type' => 'boolean',
-  );
+  $message_properties = &$info['message']['properties'];
   $message_properties['deleted'] = array(
     'label' => t('Deleted'),
     'description' => t('Whether the message has been deleted.'),
     'setter callback' => 'entity_property_verbatim_set',
-    'setter permission' => 'administer comstack content',
+    'setter permission' => 'administer comstack settings',
     'schema field' => 'deleted',
+    'type' => 'boolean',
+  );
+  $message_properties['read'] = array(
+    'label' => t('Read'),
+    'description' => t('Whether the message has been read, for simple use cases.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack settings',
+    'schema field' => 'read',
     'type' => 'boolean',
   );
 
   return $info;
-}
-
-/**
- * Custom entity getter callback used from metadata info.
- */
-function comstack_conversation_get_entity($data, array $options, $name, $type, $info) {
-  return entity_load_single($data->entity_type, $data->entity_id);
-}
-
-/**
- * Custom entity getter callback used from metadata info.
- */
-function comstack_conversation_get_sender($data, array $options, $name, $type, $info) {
-  return entity_load_single($data->sender_entity_type, $data->sender_entity_id);
 }
 
 /**
@@ -322,7 +74,7 @@ function comstack_conversation_get_sender($data, array $options, $name, $type, $
  * Message type entity access callback.
  */
 function comstack_message_type_access_callback($op, $entity = NULL, $account = NULL) {
-  return user_access('administer comstack_message_types', $account);
+  return user_access('administer comstack message_types', $account);
 }
 
 /**
@@ -334,31 +86,48 @@ function comstack_get_message_types($type_name = NULL) {
   return isset($type_name) ? reset($types) : $types;
 }
 
+/**
+ * Function to return a flat array of message types. Will be used
+ * in entity_metadata info and therefore views also.
+ */
+function comstack_get_message_types_flat() {
+  $types = comstack_get_message_types();
+  $flat = array();
+
+  if ($types) {
+    foreach ($types as $type) {
+      $flat[$type->type] = check_plain($type->label);
+    }
+  }
+
+  return $flat;
+}
+
 /* Entity CRUD functions. */
 
 /**
  * Menu argument loader; Load a message type by string.
+ * This function has been prefixed with an underscore to avoid collisions with
+ * hook_ENTITY_TYPE_load and the entity 'message_type' provided by the message
+ * module.
  *
  * @param $type
  *   The machine-readable name of a message type to load.
  * @return
  *   A message type array or FALSE if $type does not exist.
  */
-function comstack_message_type_load($type) {
+function _comstack_message_type_load($type) {
   return comstack_get_message_types($type);
 }
 
 /**
- * Entity load function.
+ * Implements hook_entity_delete().
  */
-function comstack_message_load($message_id, $reset = FALSE) {
-  $messages = comstack_message_load_multiple(array($message_id), array(), $reset);
-  return reset($messages);
-}
+function comstack_message_type_delete($entity) {
+  // Delete an associated comstack message type if there is one.
+  $comstack_message_type = _comstack_message_type_load($entity->name);
 
-/**
- * Load multiple messages based on certain conditions.
- */
-function comstack_message_load_multiple($message_ids = array(), $conditions = array(), $reset = FALSE) {
-  return entity_load('comstack_message', $message_ids, $conditions, $reset);
+  if ($comstack_message_type) {
+    entity_delete('comstack_message_type', $comstack_message_type->id);
+  }
 }

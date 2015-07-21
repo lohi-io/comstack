@@ -9,62 +9,96 @@
  * the comstack_message_type entity.
  */
 function comstack_message_type_form($form, &$form_state, $comstack_message_type, $op = 'edit', $entity_type = NULL) {
+  // Prevent any comstack messages from being created if no message module
+  // message types exists.
+  $comstack_message_types = comstack_get_message_types_flat();
+  $message_types = message_type_load();
+  $available_message_types = array();
+
+  if (empty($message_types)) {
+    return array(
+      'form_text' => array(
+        '#type' => 'markup',
+        '#value' => '<p>' . t('Comstack builds off of the Message module Message types, currently none exist. To use this module first <a href="!url">create a message type</a>.', array('!url' => url('admin/structure/messages/add'))) . '</p>',
+      ),
+    );
+  }
+
+  // Build a list of available message types.
+  if ($op === 'add') {
+    // Do it!
+    foreach ($message_types as $name => $type) {
+      if (!in_array($name, $comstack_message_types)) {
+        $available_message_types[$name] = check_plain($type->description);
+      }
+    }
+
+    // If there aren't any message types available bail out.
+    if (empty($available_message_types)) {
+      return array(
+        'form_text' => array(
+          '#type' => 'markup',
+          '#value' => '<p>' . t('Comstack builds off of the Message module Message types, all of the available types have been paired with. To add more <a href="!url">create click here</a>.', array('!url' => url('admin/structure/messages/add'))) . '</p>',
+        ),
+      );
+    }
+  }
+
   if ($op === 'clone') {
     $comstack_message_type->label .= ' (cloned)';
     $comstack_message_type->type = $entity_type . '_clone';
   }
 
-  // Check for existing content.
-  $content_count = 0;
-  if ($op != 'add' && $op != 'clone') {
-    $content_count = db_query('SELECT COUNT(*) FROM {comstack_message} WHERE type = :type', array(':type' => $comstack_message_type->type))->fetchField();
+  // The forms tabs container.
+  $form['tabs'] = array(
+    '#type' => 'vertical_tabs',
+  );
 
-    if ($content_count > 0) {
-      $form['existing_content'] = array('#markup' => t('<p><strong>Note:</strong> You cannot delete this type as messages of this type exist. Please remove the content first.</p>'));
+  // Basic settings fieldset.
+  $form['general'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('General settings'),
+    '#collapsible' => TRUE,
+    '#group' => 'tabs',
+  );
+
+  // The machine name and label are inherited from the Message type.
+  if ($op === 'add') {
+    $form['general']['type'] = array(
+      '#type' => 'select',
+      '#title' => t('Message type to pair to'),
+      '#description' => t('Comstack pairs with a message module type and extends it. Select the message type you want to extend.'),
+      '#required' => TRUE,
+      '#options' => $available_message_types,
+    );
+
+    // Store the message types for the form submit handler so we can populate
+    // the label property.
+    $form['message_types'] = array(
+      '#type' => 'value',
+      '#value' => $message_types,
+    );
+  }
+  else {
+    $message_types_flat = array();
+    foreach ($message_types as $k => $v) {
+      $message_types_flat[$k] = check_plain($v->description);
     }
+
+    $form['general']['type'] = array(
+      '#type' => 'select',
+      '#title' => t('Message type to pair to'),
+      '#options' => $message_types_flat,
+      '#default_value' => $comstack_message_type->type,
+      '#disabled' => TRUE,
+    );
+    $form['label'] = array(
+      '#type' => 'value',
+      '#value' => $comstack_message_type->label,
+    );
   }
 
-  $form['label'] = array(
-    '#title' => t('Label'),
-    '#type' => 'textfield',
-    '#required' => TRUE,
-    '#default_value' => isset($comstack_message_type->label) ? $comstack_message_type->label : '',
-  );
-
-  // Machine-readable type name.
-  $form['type'] = array(
-    '#type' => 'machine_name',
-    '#default_value' => isset($comstack_message_type->type) ? $comstack_message_type->type : '',
-    '#machine_name' => array(
-      'exists' => 'comstack_get_message_types',
-      'source' => array('label'),
-    ),
-    '#description' => t('A unique machine-readable name for this thread type. It must only contain lowercase letters, numbers, and underscores.'),
-  );
-
-  $destinations = comstack_get_destinations_flat();
-
-  $form['destination_type'] = array(
-    '#type' => 'select',
-    '#title' => t('Destination type'),
-    '#options' => $destinations,
-    '#default_value' => isset($comstack_message_type->destination_type) ? $comstack_message_type->destination_type : '',
-    '#required' => TRUE,
-  );
-
-  $form['destination_settings'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('User destination specific settings'),
-    '#collapsible' => TRUE,
-    '#collapsed' => FALSE,
-    '#states' => array(
-      'visible' => array(
-        ':input[id="edit-destination-type"]' => array('value' => 'user'),
-      ),
-    ),
-  );
-
-  $form['destination_settings']['structure'] = array(
+  $form['general']['structure'] = array(
     '#title' => t('Type structure'),
     '#type' => 'select',
     '#options' => array(
@@ -75,23 +109,116 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     '#description' => t("The type structure, Flat would constitute single messages that don't represent an ongoing dialogue. Conversation structure is the opposite, in addition to message entities conversation entities are created to wrapper and collect messages within."),
   );
 
-  $form['destination_settings']['user_preferences'] = array(
+  $form['general']['conversation_record_separate_transcripts'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Each participant in a conversation should have their own version of the dialogue history'),
+    '#default_value' => isset($comstack_message_type->conversation_record_separate_transcripts) ? $comstack_message_type->conversation_record_separate_transcripts : 0,
+    '#description' => t("This will affect how Comstack records conversation histories, unchecked there will be one transcript for all. The reason for this option is around deletion of messages - if User A sends a message to User B then deletes it, should User B still see that message? If yes check the box!"),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-structure"]' => array('value' => COMSTACK_TYPE_STRUCTURE_CONVERSATION),
+      ),
+    ),
+  );
+
+  $form['general']['subject'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Subjects'),
+    '#default_value' => isset($comstack_message_type->subject) ? $comstack_message_type->subject : 0,
+    '#description' => t('Check if the messages in this type has a subject that a user can populate. For types with conversation structure, the conversation can be named instead of individual messages.'),
+  );
+
+  $form['general']['template'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Messages of this type should follow a template'),
+    '#default_value' => isset($comstack_message_type->template) ? $comstack_message_type->template : 0,
+    '#description' => t('Check if a structured text template should be used, left unchecked the messages shall be free-form/text.'),
+  );
+
+  $form['general']['template_text'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Template text'),
+    '#default_value' => isset($comstack_message_type->template_text) ? $comstack_message_type->template_text : '',
+    '#description' => t('Template follows Drupal t() conventions... should be tokens really'),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-template"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  // User preferences.
+  $form['user_preferences'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('User preference settings'),
+    '#collapsible' => TRUE,
+    '#group' => 'tabs',
+  );
+
+  $form['user_preferences']['user_preferences'] = array(
     '#type' => 'checkbox',
     '#title' => t('Allow user preferences for this message type'),
     '#default_value' => isset($comstack_message_type->user_preferences) ? $comstack_message_type->user_preferences : 0,
     '#description' => t('This option will allow users to select which delivery methods they get messages of this type by (from the chosen set in this form).'),
   );
 
-  $form['destination_settings']['implement_perms'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Implement specific permissions for messages of this type'),
-    '#default_value' => isset($comstack_message_type->implement_perms) ? $comstack_message_type->implement_perms : 0,
-    '#description' => t('Check to provide CRUD type permissions for interacting with conversations (if the structure is set so) and/or messages of this type.'),
+  // Flood control.
+  $form['flood'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Flood control'),
+    '#collapsible' => TRUE,
+    '#group' => 'tabs',
   );
 
-  $delivery_methods = comstack_get_delivery_methods_flat();
+  $form['flood']['flood_control'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable flood control'),
+    '#default_value' => isset($comstack_message_type->flood_control) ? $comstack_message_type->flood_control : 0,
+    '#description' => t('Enable flood control to rate limit the number of messages of this type that can be sent per user.'),
+  );
 
-  $form['delivery_methods'] = array(
+  $form['flood']['flood_control_interval'] = array(
+    '#title' => t('Time interval'),
+    '#type' => 'select',
+    '#options' => drupal_map_assoc(array(60, 180, 300, 600, 900, 1800, 2700, 3600, 10800, 21600, 32400, 43200, 86400), 'format_interval'),
+    '#default_value' => isset($comstack_message_type->flood_control_interval) ? $comstack_message_type->flood_control_interval : 3600,
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-flood-control"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['flood']['flood_control_limit'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Maximum number of messages that can be sent within the interval'),
+    '#description' => t('Note that this limit will apply to individual users and API calls made by that user.'),
+    '#required' => TRUE,
+    '#default_value' => isset($comstack_message_type->flood_control_limit) ? $comstack_message_type->flood_control_limit : 50,
+    '#element_validate' => array(
+      'element_validate_integer_positive',
+    ),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-flood-control"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  // Delivery methods.
+  $form['delivery'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Delivery methods &amp; settings'),
+    '#collapsible' => TRUE,
+    '#group' => 'tabs',
+  );
+
+  //$delivery_methods = comstack_get_delivery_methods_flat();
+  $delivery_methods = array(
+    'email' => t('Email'),
+  );
+
+  $form['delivery']['delivery_methods'] = array(
     '#title' => t('Delivery methods to allow'),
     '#type' => 'checkboxes',
     '#required' => TRUE,
@@ -100,21 +227,29 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     '#tree' => TRUE,
   );
 
-  $form['store_last_read_time'] = array(
+  // Message meta settings.
+  $form['read'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Last Read &amp; Read receipts'),
+    '#collapsible' => TRUE,
+    '#group' => 'tabs',
+  );
+
+  $form['read']['store_last_read_time'] = array(
     '#type' => 'checkbox',
     '#title' => t('Store last read time'),
     '#default_value' => isset($comstack_message_type->store_last_read_time) ? $comstack_message_type->store_last_read_time : 0,
     '#description' => t('If checked message metadata will be updated storing read information.'),
   );
 
-  $form['record_read_receipts'] = array(
+  $form['read']['record_read_receipts'] = array(
     '#type' => 'checkbox',
     '#title' => t('Record read receipts'),
     '#default_value' => isset($comstack_message_type->record_read_receipts) ? $comstack_message_type->record_read_receipts : 0,
     '#description' => t('If checked detailed records of who has read a message and when will be kept. This allows for "Read at xx:xx" inline information.'),
   );
 
-  $form['record_read_receipts_fieldset'] = array(
+  $form['read']['record_read_receipts_fieldset'] = array(
     '#type' => 'fieldset',
     '#title' => t('Grouping settings'),
     '#collapsible' => TRUE,
@@ -126,14 +261,14 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     ),
   );
 
-  $form['record_read_receipts_perm'] = array(
+  $form['read']['record_read_receipts_perm'] = array(
     '#type' => 'checkbox',
     '#title' => t('Provide read receipts permissions'),
     '#default_value' => isset($comstack_message_type->record_read_receipts_perm) ? $comstack_message_type->record_read_receipts_perm : 0,
     '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
   );
 
-  $form['record_read_receipts_default'] = array(
+  $form['read']['record_read_receipts_default'] = array(
     '#type' => 'checkbox',
     '#title' => t('Enable read receipts by default?'),
     '#default_value' => isset($comstack_message_type->record_read_receipts_default) ? $comstack_message_type->record_read_receipts_default : 1,
@@ -159,13 +294,6 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     ),
   );
 
-  $form['grouping_fieldset']['delivery_methods_per_grouping'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Allow delivery methods per grouping?'),
-    '#default_value' => isset($comstack_message_type->delivery_methods_per_grouping) ? $comstack_message_type->delivery_methods_per_grouping : 0,
-    '#description' => t('Check to enable the definition of which delivery methods are used per grouping.'),
-  );
-
   $form['grouping_fieldset']['groups'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Groups'),
@@ -174,31 +302,6 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     '#tree' => TRUE,
   );
 
-  $form['subject'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Enable Subjects'),
-    '#default_value' => isset($comstack_message_type->subject) ? $comstack_message_type->subject : 0,
-    '#description' => t('Check if the messages in this type can be have a subject.'),
-  );
-
-  $form['template'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Messages of this type should follow a template'),
-    '#default_value' => isset($comstack_message_type->template) ? $comstack_message_type->template : 0,
-    '#description' => t('Check if a structured text template should be used, left unchecked the messages shall be free-form/text.'),
-  );
-
-  $form['template_text'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Template text'),
-    '#default_value' => isset($comstack_message_type->template_text) ? $comstack_message_type->template_text : '',
-    '#description' => t('Template follows Drupal t() conventions... should be tokens really'),
-    '#states' => array(
-      'visible' => array(
-        ':input[id="edit-template"]' => array('checked' => TRUE),
-      ),
-    ),
-  );
 
   $form['actions'] = array(
     '#type' => 'checkbox',
@@ -207,81 +310,26 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     '#description' => t('When enabled actions will be requested via a hook per message, e.g. Dimiss, Reply.'),
   );
 
-  $form['flood_control'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Enable flood control'),
-    '#default_value' => isset($comstack_message_type->flood_control) ? $comstack_message_type->flood_control : 0,
-    '#description' => t('Enable flood control to rate limit the number of messages of this type that can be sent per user.'),
-  );
 
-  $form['flood'] = array(
+  // Grouping fieldset.
+  $form['destination'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Flood settings'),
-    '#states' => array(
-      'visible' => array(
-        ':input[id="edit-flood-control"]' => array('checked' => TRUE),
-      ),
-    ),
-  );
-
-  $form['flood']['flood_control_interval'] = array(
-    '#title' => t('Time interval'),
-    '#type' => 'select',
-    '#options' => drupal_map_assoc(array(60, 180, 300, 600, 900, 1800, 2700, 3600, 10800, 21600, 32400, 43200, 86400), 'format_interval'),
-    '#default_value' => isset($comstack_message_type->flood_control_interval) ? $comstack_message_type->flood_control_interval : 3600,
-  );
-
-  $form['flood']['flood_control_limit'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Maximum number of reports allowed within the interval'),
-    '#required' => TRUE,
-    '#default_value' => isset($comstack_message_type->flood_control_limit) ? $comstack_message_type->flood_control_limit : 50,
-    '#element_validate' => array(
-      'element_validate_integer_positive',
-    ),
-  );
-
-  $form['defer_send_to_cron_queue'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Messages should be added to a queue which will be processed on Cron'),
-    '#default_value' => isset($comstack_message_type->defer_send_to_cron_queue) ? $comstack_message_type->defer_send_to_cron_queue : 0,
-    '#description' => t("Processing via Cron, whilst slower could be more performant if you're expecting to send a large volume of messages. If unchecked messages are sent instantly."),
-  );
-
-  $form['cron_purge_active'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Purge read messages of this type via Cron'),
-    '#default_value' => isset($comstack_message_type->cron_purge_active) ? $comstack_message_type->cron_purge_active : 0,
-    '#description' => t('This functionality requires that Cron is configured correctly.'),
-  );
-
-  $form['cron_purge'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Message purge settings'),
-    '#states' => array(
-      'visible' => array(
-        ':input[id="edit-cron-purge-active"]' => array('checked' => TRUE),
-      ),
-    ),
-  );
-
-  $form['cron_purge']['cron_purge_interval'] = array(
-    '#title' => t('Time interval'),
-    '#type' => 'select',
-    '#options' => drupal_map_assoc(array(3600, 10800, 21600, 32400, 43200, 86400, 259200, 432000, 604800, 1209600, 2592000), 'format_interval'),
-    '#default_value' => isset($comstack_message_type->cron_purge_interval) ? $comstack_message_type->cron_purge_interval : 604800,
+    '#title' => t('Message Grouping'),
+    '#collapsible' => TRUE,
+    '#group' => 'tabs',
   );
 
 
-  $form['actions'] = array('#type' => 'actions');
-  $form['actions']['submit'] = array(
+  // Form actions, named to avoid the "actions" message type entity property.
+  $form['form_actions'] = array('#type' => 'actions');
+  $form['form_actions']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save message type'),
     '#weight' => 40,
   );
 
-  if ($op != 'add' && $op != 'clone' && $content_count < 1) {
-    $form['actions']['delete'] = array(
+  if ($op != 'add' && $op != 'clone') {
+    $form['form_actions']['delete'] = array(
       '#type' => 'submit',
       '#value' => t('Delete message type'),
       '#weight' => 45,
@@ -299,6 +347,11 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
 function comstack_message_type_form_submit(&$form, &$form_state) {
   $comstack_message_type = entity_ui_form_submit_build_entity($form, $form_state);
 
+  // If adding a new comstack message then prepopulate the label property.
+  if (!isset($comstack_message_type->id)) {
+    $comstack_message_type->label = $form_state['values']['message_types'][$form_state['values']['type']]->description;
+  }
+
   // Save the entity!
   entity_save('comstack_message_type', $comstack_message_type);
 
@@ -311,4 +364,13 @@ function comstack_message_type_form_submit(&$form, &$form_state) {
  */
 function comstack_message_type_form_submit_delete(&$form, &$form_state) {
   $form_state['redirect'] = 'admin/structure/comstack/types/' . $form_state['comstack_message_type']->type . '/delete';
+}
+
+/**
+ * Admin settings form callback.
+ */
+function comstack_admin_settings_form() {
+  $form = array();
+
+  return system_settings_form($form);
 }

@@ -87,10 +87,3 @@ class ComstackEntityUIController extends EntityDefaultUIController {
     return $row;
   }*/
 }
-
-/**
- * ComstackMessageController
- * Message Entity.
- */
-class ComstackMessageController extends EntityAPIController {
-}

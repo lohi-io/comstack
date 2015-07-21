@@ -15,8 +15,10 @@ define('COMSTACK_TYPE_STRUCTURE_FLAT', 'flat');
 define('COMSTACK_TYPE_STRUCTURE_CONVERSATION', 'conversation');
 
 // Drupal lives for arrays, I bring order via includes.
+include_once __DIR__ . '/includes/comstack.drush.inc';
 include_once __DIR__ . '/includes/comstack.entity.inc';
 include_once __DIR__ . '/includes/comstack.forms.inc';
+// Pages.inc will be loaded in by the menu router system.
 
 /**
  * Implements hook_permission().
@@ -25,80 +27,15 @@ function comstack_permission() {
   $permissions = array(
     'administer comstack settings' => array(
       'title' => t('Administer Communications stack settings'),
-      'description' => t('General permission for altering stack settings.'),
+      'description' => t('General permission for altering stack settings, does not include bypass access control permission.'),
       'restrict access' => TRUE,
     ),
-    'administer comstack_message_types' => array(
+    'administer comstack message_types' => array(
       'title' => t('Administer message types'),
       'description' => t('Allows users to create, edit and delete Message types (bundles).'),
       'restrict access' => TRUE,
     ),
-    'administer comstack content' => array(
-      'title' => t('Administer Communications Stack content'),
-      'description' => t('Allows administration of all Conversations &amp; Messages sent via Communications Stack.'),
-      'restrict access' => TRUE,
-    ),
-    /*'view comstack messages' => array(
-      'title' => t('View Communications Stack messages'),
-      'description' => t("Catch all definition for viewing messages which don't have their own specific permissions."),
-    ),*/
   );
-
-  // If any Message types allow for permissions then chuck em in.
-  // Otherwise it'll use the standard access checking method of:
-  // is user an admin, recipient or sender of a message.
-  // An example of a type which might want this could be "User Activity".
-  // Establishes permissions for the ops: view, create, reply, edit, delete.
-  $message_types = comstack_get_message_types();
-  if ($message_types) {
-    foreach ($message_types as $name => $message_type) {
-      // Overall permissions for the type.
-      if ($message_type->implement_perms) {
-        // @todo Implement conversation type permissions.
-
-        $permissions["view comstack $name messages"] = array(
-          'title' => t('View Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => t('Allows users to view messages of this type instead of using the standard access checking method.'),
-        );
-        $permissions["create comstack $name messages"] = array(
-          'title' => t('Create new Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => t("Allows users to create new messages of this type, depends on UI available. Note users don't need this for system created messages to work."),
-        );
-        $permissions["reply to comstack $name messages"] = array(
-          'title' => t('Reply to Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => t('Allows users to reply to messages of this type, only applies in conversation context.'),
-        );
-        $permissions["edit own comstack $name messages"] = array(
-          'title' => t('Edit own Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => NULL,
-        );
-        $permissions["edit any comstack $name messages"] = array(
-          'title' => t('Edit own Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => NULL,
-          'restrict access' => TRUE,
-        );
-        $permissions["delete own comstack $name messages"] = array(
-          'title' => t('Delete own Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => NULL,
-        );
-        $permissions["delete any comstack $name messages"] = array(
-          'title' => t('Delete own Communications Stack @label messages', array('@label' => $message_type->label)),
-          'description' => NULL,
-          'restrict access' => TRUE,
-        );
-      }
-
-      // Read receipt permission.
-      if ($message_type->record_read_receipts_perm) {
-        $permissions["allow opt out comstack $name read receipts"] = array(
-          'title' => t('Allow opt out of Communications Stack @label message read receipts', array('@label' => $message_type->label)),
-          'description' => NULL,
-        );
-      }
-
-      // @todo Opt out entirely permission.
-    }
-  }
 
   return $permissions;
 }
@@ -121,6 +58,17 @@ function comstack_menu() {
     'weight' => -10,
   );
 
+  $items['admin/structure/comstack/types/settings'] = array(
+    'title' => 'Settings',
+    'description' => 'General settings for Comstack.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('comstack_admin_settings_form'),
+    'access arguments' => array('administer comstack settings'),
+    // Normally 'file' and 'file_path' would be defined here but we require
+    // that file at the top of this module file so no need.
+    'type' => MENU_LOCAL_ACTION,
+  );
+
   return $items;
 }
 
@@ -129,19 +77,10 @@ function comstack_menu() {
  */
 function comstack_ctools_plugin_type() {
   return array(
-    'cache' => array(
-      'use hooks' => TRUE,
-    ),
-    'delivery_methods' => array(
-      'use hooks' => TRUE,
-    ),
-    'destinations' => array(
-      'use hooks' => TRUE,
-    ),
     'input_methods' => array(
       'use hooks' => TRUE,
     ),
-    'storage' => array(
+    'ui' => array(
       'use hooks' => TRUE,
     ),
   );
@@ -151,8 +90,11 @@ function comstack_ctools_plugin_type() {
  * Implements hook_ctools_plugin_directory().
  */
 function comstack_ctools_plugin_directory($owner, $plugin_type) {
-  if ($owner == 'comstack' && in_array($plugin_type, array('cache', 'delivery_methods', 'destinations', 'input_methods', 'storage'))) {
+  if ($owner == 'comstack' && in_array($plugin_type, array('input_methods', 'ui'))) {
     return "plugins/$plugin_type";
+  }
+  elseif ($owner == 'entityreference') {
+    return 'plugins/entityreference/' . $plugin_type;
   }
 }
 
@@ -200,70 +142,37 @@ function comstack_get_plugins_flat($type) {
   return $types_flat;
 }
 
-/* Plugin based stuff. */
-
 /**
- * Function to grab all available delivery methods.
+ * Grab all available input methods.
  */
-function comstack_get_delivery_methods() {
-  return comstack_get_plugins('delivery_methods');
+function comstack_get_input_methods() {
+  return comstack_get_plugins('input_methods');
 }
 
 /**
- * Grab an array of delivery methods with id as the index and label as
- * the value.
+ * Grab an array of input_methods with id as the index and label as the value.
  */
-function comstack_get_delivery_methods_flat() {
-  return comstack_get_plugins_flat('delivery_methods');
+function comstack_get_input_methods_flat() {
+  return comstack_get_plugins_flat('input_methods');
 }
 
 /**
- * Grab a specific delivery method.
+ * Function to grab all available user interfaces.
  */
-function comstack_get_delivery_method($id) {
-  $plugins = comstack_get_plugins('delivery_methods');
-  return !empty($plugins[$id]) ? $plugins[$id] : NULL;
+function comstack_get_uis() {
+  return comstack_get_plugins('ui');
 }
 
 /**
- * Function to grab all available destinations.
+ * Grab an array of user interfaces with id as the index and label as the
+ * value.
  */
-function comstack_get_destinations() {
-  return comstack_get_plugins('destinations');
+function comstack_get_uis_flat() {
+  return comstack_get_plugins_flat('ui');
 }
 
 /**
- * Grab an array of destinations with id as the index and label as
- * the value.
- */
-function comstack_get_destinations_flat() {
-  return comstack_get_plugins_flat('destinations');
-}
-
-/**
- * Grab a specific destinations.
- */
-function comstack_get_destination($id) {
-  $plugins = comstack_get_plugins('destinations');
-  return !empty($plugins[$id]) ? $plugins[$id] : NULL;
-}
-
-/**
- * Function to return a flat array of message types. Will be used
- * in entity_metadata info and therefore views also.
- */
-function comstack_get_message_types_flat() {
-  $types = comstack_get_message_types();
-
-  if (!empty($types)) {
-    $flat_types = array();
-    foreach ($types as $type => $info) {
-      $flat_types[$type] = $info->label;
-    }
-
-    return $flat_types;
-  }
-  else {
-    return array();
-  }
-}
+* The functions comstack_get_message_types() and
+* comstack_get_message_types_flat() can be found in
+* includes/comstack.entity.inc.
+*/

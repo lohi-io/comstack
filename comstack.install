@@ -53,6 +53,64 @@ function comstack_schema() {
         'not null' => TRUE,
         'default' => 'flat',
       ),
+      'conversation_record_separate_transcripts' => array(
+        'description' => 'Boolean indicating whether participants of a conversation should have their own histories. Means the {comstack_conversation_message} table is used.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+      'subject' => array(
+        'description' => 'Boolean indicating whether messages of this type should have a subject.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+      'template' => array(
+        'description' => 'Boolean indicating whether the messages in this type use a template, if not then the message is free text.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+      'template_text' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => 'The text to use for the message template, follows t() function conventions.',
+      ),
+      'user_preferences' => array(
+        'description' => 'Boolean indicating whether users can set preferences as to what send methods they want to receive messages by.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+      'flood_control' => array(
+        'description' => 'Boolean indicating whether this messages type has flood controls active.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'boolean' => TRUE,
+      ),
+      'flood_control_interval' => array(
+        'description' => 'Timespan which applies to the limit.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 3600,
+      ),
+      'flood_control_limit' => array(
+        'description' => 'Number of messages of this type that can be sent within the time interval.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 50,
+      ),
       'store_last_read_time' => array(
         'description' => 'Boolean indicating whether the messages in this type should record time last read.',
         'type' => 'int',
@@ -99,19 +157,26 @@ function comstack_schema() {
         'serialize' => TRUE,
         'description' => 'A serialized array of allowed delivery methods for this type.',
       ),
+      'ui_settings' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of allowed UI settings for this type.',
+      ),
+      'notification_settings' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of allowed notification settings for this type.',
+      ),
       'grouping' => array(
         'description' => 'Boolean indicating whether the messages in this type can be grouped together, e.g. Notifications with the groups: Photo, Note, Comment reply.',
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
         'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'delivery_methods_per_grouping' => array(
-        'description' => 'Boolean indicating whether the messages in this type can be grouped by category.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
         'boolean' => TRUE,
       ),
       'groups' => array(
@@ -121,35 +186,6 @@ function comstack_schema() {
         'serialize' => TRUE,
         'description' => 'A serialized array of allowed groups for this type.',
       ),
-      'destination_type' => array(
-        'type' => 'varchar',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => '',
-        'description' => 'The destination entity type, such as one of "node", "harmony_thread", or "user".',
-      ),
-      'subject' => array(
-        'description' => 'Boolean indicating whether messages of this type should have a subject.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'template' => array(
-        'description' => 'Boolean indicating whether the messages in this type use a template, if not then the message is free text.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'template_text' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'description' => 'The text to use for the message template, follows t() function conventions.',
-      ),
       'actions' => array(
         'description' => 'Boolean indicating whether messages of this type can have actions defined for them per message.',
         'type' => 'int',
@@ -158,64 +194,6 @@ function comstack_schema() {
         'size' => 'tiny',
         'boolean' => TRUE,
       ),
-      'user_preferences' => array(
-        'description' => 'Boolean indicating whether users can set preferences as to what send methods they want to receive messages by.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'implement_perms' => array(
-        'description' => 'Boolean indicating whether this messages type use permissions instead of standard access method.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'flood_control' => array(
-        'description' => 'Boolean indicating whether this messages type has flood controls active.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'flood_control_interval' => array(
-        'description' => 'Timespan which applies to the limit.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 3600,
-      ),
-      'flood_control_limit' => array(
-        'description' => 'Number of messages of this type that can be sent within the time interval.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 50,
-      ),
-      'defer_send_to_cron_queue' => array(
-        'description' => 'Boolean indicating whether the messages in this type should be sent to a cron queue, or sent instantly.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'cron_purge_active' => array(
-        'description' => 'Boolean indicating whether the read messages in this type should be purged from the database on Cron.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'cron_purge_interval' => array(
-        'description' => 'Time interval after which to purge read messages if Cron purging is active.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 604800,
-      ),
     ),
     'unique keys' => array(
       'type' => array('type'),
@@ -223,527 +201,60 @@ function comstack_schema() {
     'primary key' => array('id'),
   );
 
-  $schema['comstack_conversation'] = array(
-    'description' => 'The base table for conversations sent via the Communications Stack.',
-    'fields' => array(
-      'conversation_id' => array(
-        'description' => 'The primary identifier for this conversation.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'type' => array(
-        'description' => 'The {comstack_message}.type of this conversation.',
-        'type' => 'varchar',
-        'length' => 32,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'entity_type' => array(
-        'description' => 'The entity type that started the conversation.',
-        'type' => 'varchar',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'entity_id' => array(
-        'description' => 'The ID of the entity which started the conversation.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'container' => array(
-        'description' => 'The machine name of the container e.g. Folder this conversation lives in.',
-        'type' => 'varchar',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'started' => array(
-        'description' => 'The Unix timestamp when the message was started.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'updated' => array(
-        'description' => 'The Unix timestamp when the message was last updated.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'title' => array(
-        'description' => 'The title, subject or name of the conversation.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'messages_count' => array(
-        'description' => 'Number of messages in this conversation.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'pinned' => array(
-        'description' => 'Boolean indicating whether this conversation is pinned.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'deleted' => array(
-        'description' => 'Boolean indicating whether this conversation is marked as deleted.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-    ),
-    'indexes' => array(
-      'type' => array('type'),
-      'entity_type' => array('entity_type'),
-      'entity_id' => array('entity_id'),
-      'started' => array('started'),
-      'updated' => array('updated'),
-      'messages_count' => array('messages_count'),
-      'pinned' => array('pinned'),
-      'deleted' => array('deleted'),
-    ),
-    'foreign keys' => array(
-      'type' => array(
-        'table' => 'comstack_message_type',
-        'columns' => array('type' => 'type'),
-      ),
-    ),
-    'primary key' => array('conversation_id'),
-  );
-
-  $schema['comstack_conversation_entity'] = array(
-    'description' => 'Linkage between a conversation and the recipients read state/participation. Simplest example would be user entity.',
-    'fields' => array(
-      'ceid' => array(
-        'description' => 'The primary identifier for this record.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'conversation_id' => array(
-        'description' => 'The ID of the conversation the entity (typically user) is a part of.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'entity_type' => array(
-        'description' => 'The type of entity which is part of the conversation.',
-        'type' => 'varchar',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'entity_id' => array(
-        'description' => 'The ID of the entity which is part of the conversation.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'unread_count' => array(
-        'description' => 'Number of messages in this conversation which are unread.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'delivered' => array(
-        'description' => 'Boolean indicating whether the most recent message(s) have been delivered this conversation participant.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'muted' => array(
-        'description' => 'Boolean indicating whether updates in this conversation should alert the destination entity.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'forwarded' => array(
-        'description' => 'Boolean indicating whether this conversation has been forwarded by the participant entity.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-    ),
-    'indexes' => array(
-      'conversation_id' => array('conversation_id'),
-      'entity_type' => array('entity_type'),
-      'entity_id' => array('entity_id'),
-      'unread_count' => array('unread_count'),
-    ),
-    'foreign keys' => array(
-      'conversation' => array(
-        'table' => 'comstack_conversation',
-        'columns' => array('conversation_id' => 'conversation_id'),
-      ),
-    ),
-    'primary key' => array('ceid'),
-  );
-
-  $schema['comstack_conversation_message'] = array(
-    'description' => 'Storage for when a message type requires that a conversation keeps separate histories for each participant.',
-    'fields' => array(
-      'ccmid' => array(
-        'description' => 'The primary identifier for this record.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'conversation_id' => array(
-        'description' => 'The ID of the conversation the entity (typically user) is a part of.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'message_id' => array(
-        'description' => 'The ID of the message that has been read.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'deleted' => array(
-        'description' => 'Boolean indicating whether this conversation is marked as deleted.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-    ),
-    'indexes' => array(
-      'conversation_id' => array('conversation_id'),
-      'message_id' => array('message_id'),
-    ),
-    'foreign keys' => array(
-      'conversation' => array(
-        'table' => 'comstack_conversation',
-        'columns' => array('conversation_id' => 'conversation_id'),
-      ),
-      'message' => array(
-        'table' => 'comstack_message',
-        'columns' => array('message_id' => 'message_id'),
-      ),
-    ),
-    'primary key' => array('ccmid'),
-  );
-
-  // This could be an implementation of comstack itself, templated text.
-  $schema['comstack_conversation_event'] = array(
-    'description' => 'Events that happen in a conversation, e.g. A user was added to the conversation.',
-    'fields' => array(
-      'conversation_event_id' => array(
-        'description' => 'The primary identifier for this record.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'conversation_id' => array(
-        'description' => 'The ID of the conversation the user is a part of.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'uid' => array(
-        'description' => 'ID of Drupal user involved, -1 means system.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => -1,
-      ),
-      'timestamp' => array(
-        'description' => 'The Unix timestamp when the event happened.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'template' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'description' => 'The event template.',
-      ),
-      'text_replacements' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'serialize' => TRUE,
-        'description' => 'A serialized array of replacements.',
-      ),
-    ),
-    'indexes' => array(
-      'conversation_id' => array('conversation_id'),
-      'uid' => array('uid'),
-      'timestamp' => array('timestamp'),
-    ),
-    'foreign keys' => array(
-      'conversation' => array(
-        'table' => 'comstack_conversation',
-        'columns' => array('conversation_id' => 'conversation_id'),
-      ),
-      'uid' => array(
-        'table' => 'users',
-        'columns' => array('uid' => 'uid'),
-      ),
-    ),
-    'primary key' => array('conversation_event_id'),
-  );
-
-  $schema['comstack_message'] = array(
-    'description' => 'The base table for messages sent via the Communications Stack.',
-    'fields' => array(
-      'message_id' => array(
-        'description' => 'The primary identifier for this message.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'type' => array(
-        'description' => 'The {comstack_message}.type of this message.',
-        'type' => 'varchar',
-        'length' => 32,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'sender_entity_type' => array(
-        'description' => 'The sender entity type, such as one of "node", "comment", or "user".',
-        'type' => 'varchar',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'sender_entity_id' => array(
-        'description' => 'ID of sender entity.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => -1,
-      ),
-      'entity_type' => array(
-        'description' => 'The destination entity type, such as one of "node", "comment", or "user".',
-        'type' => 'varchar',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'entity_id' => array(
-        'description' => 'ID of destination entity.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => -1,
-      ),
-      'sent' => array(
-        'description' => 'The Unix timestamp when the message was sent.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'subject' => array(
-        'description' => 'The subject of the message.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'title' => array(
-        'description' => 'The title or name of the conversation.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'text' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'description' => 'The message text if not a template.',
-      ),
-      'text_replacements' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'serialize' => TRUE,
-        'description' => 'A serialized array of replacements if message uses a template.',
-      ),
-      'actions' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'serialize' => TRUE,
-        'description' => 'A serialized array of actions to perform if allowed by the type.',
-      ),
-      'delivered' => array(
-        'description' => 'Boolean indicating whether this message has been delivered to all recipients.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'all_have_read' => array(
-        'description' => 'Boolean indicating whether this message has been read by all recipients.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'read_by_updated' => array(
-        'description' => 'The Unix timestamp when the read by entity ref field was last updated.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'pinned' => array(
-        'description' => 'Boolean indicating whether this message is pinned.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-      'deleted' => array(
-        'description' => 'Boolean indicating whether this message is marked as deleted.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'size' => 'tiny',
-        'boolean' => TRUE,
-      ),
-    ),
-    'indexes' => array(
-      'type' => array('type'),
-      'sender_entity_type' => array('sender_entity_type'),
-      'sender_entity_id' => array('sender_entity_id'),
-      'entity_type' => array('entity_type'),
-      'entity_id' => array('entity_id'),
-      'sent' => array('sent'),
-      'all_have_read' => array('all_have_read'),
-      'pinned' => array('pinned'),
-      'deleted' => array('deleted'),
-    ),
-    'foreign keys' => array(
-      'type' => array(
-        'table' => 'comstack_message_type',
-        'columns' => array('type' => 'type'),
-      ),
-    ),
-    'primary key' => array('message_id'),
-  );
-
-  $schema['comstack_read_receipt'] = array(
-    'description' => 'Storage for read receipts for messages sent via Communications Stack.',
-    'fields' => array(
-      'receipt_id' => array(
-        'description' => 'The primary identifier for this message.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'message_id' => array(
-        'description' => 'The ID of the message that has been read.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'uid' => array(
-        'description' => 'ID of Drupal user who read a message.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'expires' => array(
-        'description' => 'The Unix timestamp when or after that the receipt should be deleted.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-    ),
-    'indexes' => array(
-      'message_id' => array('message_id'),
-      'uid' => array('uid'),
-      'expires' => array('expires'),
-    ),
-    'foreign keys' => array(
-      'message' => array(
-        'table' => 'comstack_message',
-        'columns' => array('message_id' => 'message_id'),
-      ),
-      'uid' => array(
-        'table' => 'users',
-        'columns' => array('uid' => 'uid'),
-      ),
-    ),
-    'primary key' => array('receipt_id'),
-  );
-
-  $schema['comstack_user_preferences'] = array(
-    'description' => 'Storage for a users preferences as to what delivery methods should be used for a type.',
-    'fields' => array(
-      'pref_id' => array(
-        'description' => 'The primary identifier for this user preference record.',
-        'type' => 'serial',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-      ),
-      'uid' => array(
-        'description' => 'ID of Drupal user that this preference will affect.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'preferences' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-        'size' => 'big',
-        'serialize' => TRUE,
-        'description' => 'A serialized array of sending method preferences.',
-      ),
-    ),
-    'unique keys' => array(
-      'uid' => array('uid'),
-    ),
-    'foreign keys' => array(
-      'uid' => array(
-        'table' => 'users',
-        'columns' => array('uid' => 'uid'),
-      ),
-    ),
-    'primary key' => array('pref_id'),
-  );
-
   return $schema;
+}
+
+/**
+ * Implements hook_schema_alter().
+ */
+function comstack_schema_alter(&$schema) {
+  // Add field to existing schema.
+  $schema['message']['fields']['actions'] = array(
+    'type' => 'text',
+    'not null' => FALSE,
+    'size' => 'big',
+    'serialize' => TRUE,
+    'description' => 'A serialized array of actions to perform if allowed by the type.',
+  );
+  $schema['message']['fields']['deleted'] = array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => TRUE,
+    'default' => 0,
+    'boolean' => TRUE,
+    'description' => 'Boolean to store whether or not this message has been deleted.',
+  );
+  $schema['message']['fields']['read'] = array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => TRUE,
+    'default' => 0,
+    'boolean' => TRUE,
+    'description' => 'Boolean to store if this message has been read for simple use cases.',
+  );
 }
 
 /**
  * Implements hook_install().
  */
 function comstack_install() {
-
+  // Alter the message table.
+  if (!db_field_exists('message', 'actions')) {
+    $schema = drupal_get_schema('message');
+    db_add_field('message', 'actions', $schema['fields']['actions']);
+    db_add_field('message', 'deleted', $schema['fields']['deleted']);
+    db_add_field('message', 'read', $schema['fields']['read']);
+  }
 }
 
 /**
  * Implements hook_uninstall().
  */
 function comstack_uninstall() {
-  variable_del('comstack_killswitch');
+  // Remove the fields we've added to {message}.
+  if (db_field_exists('message', 'actions')) {
+    db_drop_field('message', 'actions');
+    db_drop_field('message', 'deleted');
+    db_drop_field('message', 'read');
+  }
 }
