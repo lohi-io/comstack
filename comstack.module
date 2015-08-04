@@ -18,7 +18,7 @@ define('COMSTACK_TYPE_STRUCTURE_CONVERSATION', 'conversation');
 include_once __DIR__ . '/includes/comstack.drush.inc';
 include_once __DIR__ . '/includes/comstack.entity.inc';
 include_once __DIR__ . '/includes/comstack.forms.inc';
-// Pages.inc will be loaded in by the menu router system.
+include_once __DIR__ . '/includes/comstack.comstack.inc';
 
 /**
  * Implements hook_permission().
@@ -176,3 +176,26 @@ function comstack_get_uis_flat() {
 * comstack_get_message_types_flat() can be found in
 * includes/comstack.entity.inc.
 */
+
+/**
+ * Implements hook_image_default_styles().
+ */
+function comstack_image_default_styles() {
+  $styles = array();
+
+  $styles['comstack-200-200'] = array(
+    'label' => 'comstack-200-200',
+    'effects' => array(
+      1 => array(
+        'name' => 'image_scale_and_crop',
+        'data' => array(
+          'width' => 200,
+          'height' => 200,
+        ),
+        'weight' => 1,
+      ),
+    ),
+  );
+
+  return $styles;
+}
