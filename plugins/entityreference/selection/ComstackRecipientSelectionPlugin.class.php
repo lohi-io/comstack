@@ -4,6 +4,13 @@
  * Comstack recipient selection handler.
  */
 class ComstackRecipientSelectionPlugin extends EntityReference_SelectionHandler_Generic_user {
+  /**
+   * Implements EntityReferenceHandler::getInstance().
+   */
+  public static function getInstance($field, $instance = NULL, $entity_type = NULL, $entity = NULL) {
+    return new ComstackRecipientSelectionPlugin($field, $instance, $entity_type, $entity);
+  }
+
   public function buildEntityFieldQuery($match = NULL, $match_operator = 'CONTAINS') {
     $query = parent::buildEntityFieldQuery($match, $match_operator);
 
@@ -25,6 +32,5 @@ class ComstackRecipientSelectionPlugin extends EntityReference_SelectionHandler_
   }
 
   public function entityFieldQueryAlter(SelectQueryInterface $query) {
-
   }
 }
