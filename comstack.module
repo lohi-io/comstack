@@ -58,15 +58,22 @@ function comstack_menu() {
     'weight' => -10,
   );
 
-  $items['admin/structure/comstack/types/settings'] = array(
+  $items['admin/structure/comstack/settings'] = array(
     'title' => 'Settings',
+    'description' => 'Manage the Communications Stack.',
+    'access arguments' => array('administer comstack settings'),
+    'page callback' => 'system_admin_menu_block_page',
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+
+  $items['admin/structure/comstack/settings/general'] = array(
+    'title' => 'General Settings',
     'description' => 'General settings for Comstack.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('comstack_admin_settings_form'),
     'access arguments' => array('administer comstack settings'),
-    // Normally 'file' and 'file_path' would be defined here but we require
-    // that file at the top of this module file so no need.
-    'type' => MENU_LOCAL_ACTION,
+    'weight' => -1,
   );
 
   return $items;
