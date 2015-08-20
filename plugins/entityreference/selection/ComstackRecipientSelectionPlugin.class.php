@@ -12,7 +12,11 @@ class ComstackRecipientSelectionPlugin extends EntityReference_SelectionHandler_
   }
 
   public function buildEntityFieldQuery($match = NULL, $match_operator = 'CONTAINS') {
+    global $user;
     $query = parent::buildEntityFieldQuery($match, $match_operator);
+
+    // Exclude the current user.
+    $query->entityCondition('entity_id', $user->uid, '!=');
 
     // The user entity doesn't have a label column.
     if (isset($match)) {
