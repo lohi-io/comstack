@@ -98,35 +98,42 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
     );
   }
 
-  $form['general']['structure'] = array(
-    '#title' => t('Type structure'),
-    '#type' => 'select',
-    '#options' => array(
-      COMSTACK_TYPE_STRUCTURE_FLAT => t('Flat'),
-      COMSTACK_TYPE_STRUCTURE_CONVERSATION => t('Conversation'),
-    ),
-    '#default_value' => isset($comstack_message_type->structure) ? $comstack_message_type->structure : COMSTACK_TYPE_STRUCTURE_FLAT,
-    '#description' => t("The type structure, Flat would constitute single messages that don't represent an ongoing dialogue. Conversation structure is the opposite, in addition to message entities conversation entities are created to wrapper and collect messages within."),
-  );
-
-  $form['general']['conversation_record_separate_transcripts'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Each participant in a conversation should have their own version of the dialogue history'),
-    '#default_value' => isset($comstack_message_type->conversation_record_separate_transcripts) ? $comstack_message_type->conversation_record_separate_transcripts : 0,
-    '#description' => t("This will affect how Comstack records conversation histories, unchecked there will be one transcript for all. The reason for this option is around deletion of messages - if User A sends a message to User B then deletes it, should User B still see that message? If yes check the box!"),
-    '#states' => array(
-      'visible' => array(
-        ':input[id="edit-structure"]' => array('value' => COMSTACK_TYPE_STRUCTURE_CONVERSATION),
+  $comstack_pm = module_exists('comstack_pm');
+  if ($comstack_pm) {
+    $form['general']['structure'] = array(
+      '#title' => t('Type structure'),
+      '#type' => 'select',
+      '#options' => array(
+        COMSTACK_TYPE_STRUCTURE_FLAT => t('Flat'),
+        COMSTACK_TYPE_STRUCTURE_CONVERSATION => t('Conversation'),
       ),
-    ),
-  );
+      '#default_value' => isset($comstack_message_type->structure) ? $comstack_message_type->structure : COMSTACK_TYPE_STRUCTURE_FLAT,
+      '#description' => t("The type structure, Flat would constitute single messages that don't represent an ongoing dialogue. Conversation structure is the opposite, in addition to message entities conversation entities are created to wrapper and collect messages within."),
+    );
+
+    $form['general']['conversation_record_separate_transcripts'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Each participant in a conversation should have their own version of the dialogue history'),
+      '#default_value' => isset($comstack_message_type->conversation_record_separate_transcripts) ? $comstack_message_type->conversation_record_separate_transcripts : 0,
+      '#description' => t("This will affect how Comstack records conversation histories, unchecked there will be one transcript for all. The reason for this option is around deletion of messages - if User A sends a message to User B then deletes it, should User B still see that message? If yes check the box!"),
+      '#states' => array(
+        'visible' => array(
+          ':input[id="edit-structure"]' => array('value' => COMSTACK_TYPE_STRUCTURE_CONVERSATION),
+        ),
+      ),
+    );
+  }
 
   $form['general']['subject'] = array(
     '#type' => 'checkbox',
     '#title' => t('Enable Subjects'),
     '#default_value' => isset($comstack_message_type->subject) ? $comstack_message_type->subject : 0,
-    '#description' => t('Check if the messages in this type has a subject that a user can populate. For types with conversation structure, the conversation can be named instead of individual messages.'),
+    '#description' => t('Check if the messages in this type has a subject that a user can populate.'),
   );
+
+  if ($comstack_pm) {
+    $form['general']['subject']['#description'] .= ' ' . t('For types with conversation structure, the conversation can be named instead of individual messages.');
+  }
 
   $form['general']['template'] = array(
     '#type' => 'checkbox',
@@ -228,52 +235,54 @@ function comstack_message_type_form($form, &$form_state, $comstack_message_type,
   );
 
   // Message meta settings.
-  $form['read'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Last Read &amp; Read receipts'),
-    '#collapsible' => TRUE,
-    '#group' => 'tabs',
-  );
+  if (module_exists('comstack_read_receipts')) {
+    $form['read'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Last Read &amp; Read receipts'),
+      '#collapsible' => TRUE,
+      '#group' => 'tabs',
+    );
 
-  $form['read']['store_last_read_time'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Store last read time'),
-    '#default_value' => isset($comstack_message_type->store_last_read_time) ? $comstack_message_type->store_last_read_time : 0,
-    '#description' => t('If checked message metadata will be updated storing read information.'),
-  );
+    $form['read']['store_last_read_time'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Store last read time'),
+      '#default_value' => isset($comstack_message_type->store_last_read_time) ? $comstack_message_type->store_last_read_time : 0,
+      '#description' => t('If checked message metadata will be updated storing read information.'),
+    );
 
-  $form['read']['record_read_receipts'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Record read receipts'),
-    '#default_value' => isset($comstack_message_type->record_read_receipts) ? $comstack_message_type->record_read_receipts : 0,
-    '#description' => t('If checked detailed records of who has read a message and when will be kept. This allows for "Read at xx:xx" inline information.'),
-  );
+    $form['read']['record_read_receipts'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Record read receipts'),
+      '#default_value' => isset($comstack_message_type->record_read_receipts) ? $comstack_message_type->record_read_receipts : 0,
+      '#description' => t('If checked detailed records of who has read a message and when will be kept. This allows for "Read at xx:xx" inline information.'),
+    );
 
-  $form['read']['record_read_receipts_fieldset'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Grouping settings'),
-    '#collapsible' => TRUE,
-    '#collapsed' => FALSE,
-    '#states' => array(
-      'visible' => array(
-        ':input[id="edit-record-read-receipts"]' => array('checked' => TRUE),
+    $form['read']['record_read_receipts_fieldset'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Grouping settings'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#states' => array(
+        'visible' => array(
+          ':input[id="edit-record-read-receipts"]' => array('checked' => TRUE),
+        ),
       ),
-    ),
-  );
+    );
 
-  $form['read']['record_read_receipts_perm'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Provide read receipts permissions'),
-    '#default_value' => isset($comstack_message_type->record_read_receipts_perm) ? $comstack_message_type->record_read_receipts_perm : 0,
-    '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
-  );
+    $form['read']['record_read_receipts_perm'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Provide read receipts permissions'),
+      '#default_value' => isset($comstack_message_type->record_read_receipts_perm) ? $comstack_message_type->record_read_receipts_perm : 0,
+      '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
+    );
 
-  $form['read']['record_read_receipts_default'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Enable read receipts by default?'),
-    '#default_value' => isset($comstack_message_type->record_read_receipts_default) ? $comstack_message_type->record_read_receipts_default : 1,
-    '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
-  );
+    $form['read']['record_read_receipts_default'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable read receipts by default?'),
+      '#default_value' => isset($comstack_message_type->record_read_receipts_default) ? $comstack_message_type->record_read_receipts_default : 1,
+      '#description' => t('Provide a new permission that will allow individual users to opt out of sending read receipts.'),
+    );
+}
 
   $form['grouping'] = array(
     '#type' => 'checkbox',
