@@ -40,11 +40,17 @@ function comstack_entity_info() {
  */
 function comstack_entity_property_info_alter(&$info) {
   // Message type entity.
-  $message_type_properties = &$info['comstack_message_type']['properties'];
-  $message_type_properties = array();
+  $comstack_message_type_properties = &$info['comstack_message_type']['properties'];
+  $comstack_message_type_properties = array();
 
   // Message entity.
   $message_properties = &$info['message']['properties'];
+
+  $message_properties['updated'] = $message_properties['timestamp'];
+  $message_properties['updated']['label'] = t('Updated');
+  $message_properties['updated']['description'] = t('The time the message was last updated.');
+  $message_properties['updated']['schema field'] = 'updated';
+
   $message_properties['deleted'] = array(
     'label' => t('Deleted'),
     'description' => t('Whether the message has been deleted.'),
@@ -53,16 +59,22 @@ function comstack_entity_property_info_alter(&$info) {
     'schema field' => 'deleted',
     'type' => 'boolean',
   );
-  $message_properties['read'] = array(
-    'label' => t('Read'),
-    'description' => t('Whether the message has been read, for simple use cases.'),
+  $message_properties['viewed'] = array(
+    'label' => t('Viewed'),
+    'description' => t('Whether the message has been viewed, for simple use cases.'),
     'setter callback' => 'entity_property_verbatim_set',
     'setter permission' => 'administer comstack settings',
-    'schema field' => 'read',
+    'schema field' => 'viewed',
     'type' => 'boolean',
   );
-
-  return $info;
+  $message_properties['weight'] = array(
+    'label' => t('Weight'),
+    'description' => t('Integer field used for sorting.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer comstack settings',
+    'schema field' => 'weight',
+    'type' => 'integer',
+  );
 }
 
 /**

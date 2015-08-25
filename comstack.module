@@ -4,16 +4,6 @@
  * comstack.module
  */
 
-/**
- * Flat messages don't belong to a thread/conversation.
- */
-define('COMSTACK_TYPE_STRUCTURE_FLAT', 'flat');
-
-/**
- * Messages that do belong to a conversation, part of a dialogue.
- */
-define('COMSTACK_TYPE_STRUCTURE_CONVERSATION', 'conversation');
-
 // Drupal lives for arrays, I bring order via includes.
 include_once __DIR__ . '/includes/comstack.drush.inc';
 include_once __DIR__ . '/includes/comstack.entity.inc';
@@ -33,6 +23,11 @@ function comstack_permission() {
     'administer comstack message_types' => array(
       'title' => t('Administer message types'),
       'description' => t('Allows users to create, edit and delete Message types (bundles).'),
+      'restrict access' => TRUE,
+    ),
+    'administer comstack content' => array(
+      'title' => t('Administer Communications Stack content'),
+      'description' => t('Catch all permission for Communications Stack content.'),
       'restrict access' => TRUE,
     ),
   );

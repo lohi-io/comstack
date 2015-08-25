@@ -208,13 +208,13 @@ function comstack_schema() {
  * Implements hook_schema_alter().
  */
 function comstack_schema_alter(&$schema) {
-  // Add field to existing schema.
-  $schema['message']['fields']['actions'] = array(
-    'type' => 'text',
-    'not null' => FALSE,
-    'size' => 'big',
-    'serialize' => TRUE,
-    'description' => 'A serialized array of actions to perform if allowed by the type.',
+  // Add fields to the existing {message} schema.
+  $schema['message']['fields']['updated'] = array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'default' => 0,
+    'unsigned' => TRUE,
+    'description' => 'When the message instance was recorded.',
   );
   $schema['message']['fields']['deleted'] = array(
     'type' => 'int',
@@ -224,13 +224,30 @@ function comstack_schema_alter(&$schema) {
     'boolean' => TRUE,
     'description' => 'Boolean to store whether or not this message has been deleted.',
   );
-  $schema['message']['fields']['read'] = array(
+  // If we wanted to be smarter we could store a timestamp here, then again
+  // is only intended for use where a single user would "Read" the message.
+  // If something smarter is needed we'd be going near comstack_read_receipts.
+  $schema['message']['fields']['viewed'] = array(
     'type' => 'int',
     'size' => 'tiny',
     'not null' => TRUE,
     'default' => 0,
     'boolean' => TRUE,
-    'description' => 'Boolean to store if this message has been read for simple use cases.',
+    'description' => 'Boolean to store if this message has been viewed for simple use cases.',
+  );
+  $schema['message']['fields']['weight'] = array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => TRUE,
+    'default' => 0,
+    'description' => 'A small integer field which allows sorting of messages, max value of 127.',
+  );
+  $schema['message']['fields']['actions'] = array(
+    'type' => 'text',
+    'not null' => FALSE,
+    'size' => 'big',
+    'serialize' => TRUE,
+    'description' => 'A serialized array of actions to perform if allowed by the type.',
   );
 }
 
@@ -239,11 +256,13 @@ function comstack_schema_alter(&$schema) {
  */
 function comstack_install() {
   // Alter the message table.
-  if (!db_field_exists('message', 'actions')) {
+  if (!db_field_exists('message', 'updated')) {
     $schema = drupal_get_schema('message');
-    db_add_field('message', 'actions', $schema['fields']['actions']);
+    db_add_field('message', 'updated', $schema['fields']['updated']);
     db_add_field('message', 'deleted', $schema['fields']['deleted']);
-    db_add_field('message', 'read', $schema['fields']['read']);
+    db_add_field('message', 'viewed', $schema['fields']['viewed']);
+    db_add_field('message', 'weight', $schema['fields']['weight']);
+    db_add_field('message', 'actions', $schema['fields']['actions']);
   }
 }
 
@@ -252,9 +271,11 @@ function comstack_install() {
  */
 function comstack_uninstall() {
   // Remove the fields we've added to {message}.
-  if (db_field_exists('message', 'actions')) {
-    db_drop_field('message', 'actions');
+  if (db_field_exists('message', 'updated')) {
+    db_drop_field('message', 'updated');
     db_drop_field('message', 'deleted');
-    db_drop_field('message', 'read');
+    db_drop_field('message', 'viewed');
+    db_drop_field('message', 'weight');
+    db_drop_field('message', 'actions');
   }
 }
