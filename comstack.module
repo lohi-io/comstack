@@ -30,6 +30,11 @@ function comstack_permission() {
       'description' => t('Catch all permission for Communications Stack content.'),
       'restrict access' => TRUE,
     ),
+    'view deleted comstack messages' => array(
+      'title' => t('View messages which have been marked as deleted'),
+      'description' => t('In certain cases like with Private Messaging Comstack will retain deleted messages if told to for potential future review in cases of abuse.'),
+      'restrict access' => TRUE,
+    ),
   );
 
   return $permissions;
