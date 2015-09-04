@@ -245,7 +245,6 @@ function comstack_schema_alter(&$schema) {
   $schema['message']['fields']['actions'] = array(
     'type' => 'text',
     'not null' => FALSE,
-    'default' => '',
     'size' => 'big',
     'serialize' => TRUE,
     'description' => 'A serialized array of actions to perform if allowed by the type.',
