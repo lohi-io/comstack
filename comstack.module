@@ -4,6 +4,10 @@
  * comstack.module
  */
 
+// Constants.
+define('COMSTACK_ALLOW', 'allow');
+define('COMSTACK_DENY', 'deny');
+
 // Drupal lives for arrays, I bring order via includes.
 include_once __DIR__ . '/includes/comstack.drush.inc';
 include_once __DIR__ . '/includes/comstack.entity.inc';

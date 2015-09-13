@@ -36,6 +36,14 @@ function comstack_entity_info() {
 }
 
 /**
+ * Implements hook_entity_info_alter().
+ */
+function comstack_entity_info_alter(&$entity_info) {
+  // Alter the message entity access callback to be our own access callback.
+  $entity_info['message']['access callback'] = '_comstack_message_access';
+}
+
+/**
  * Implements hook_entity_property_info_alter().
  */
 function comstack_entity_property_info_alter(&$info) {
@@ -46,6 +54,7 @@ function comstack_entity_property_info_alter(&$info) {
   // Message entity.
   $message_properties = &$info['message']['properties'];
 
+  // Updated gets to be a clone of timestamp, mostly.
   $message_properties['updated'] = $message_properties['timestamp'];
   $message_properties['updated']['label'] = t('Updated');
   $message_properties['updated']['description'] = t('The time the message was last updated.');
@@ -141,4 +150,17 @@ function comstack_message_type_delete($entity) {
   if ($comstack_message_type) {
     entity_delete('comstack_message_type', $comstack_message_type->id);
   }
+}
+
+/**
+ * Message entity access callback.
+ */
+function _comstack_message_access($op, $entity, $account = NULL, $entity_type = 'message') {
+  // Try and find a callback based off of the bundle name.
+  $func = '_comstack_message_access__' . $entity->type;
+  if (function_exists($func)) {
+    return $func($op, $entity, $account, $entity_type);
+  }
+
+  return message_access($op, $entity, $account, $entity_type);
 }
