@@ -156,6 +156,17 @@ function comstack_message_type_delete($entity) {
  * Message entity access callback.
  */
 function _comstack_message_access($op, $entity, $account = NULL, $entity_type = 'message') {
+  /**
+   * Account for Entity Metadata wrapper weirdness, it's possible through
+   * \RestfulBase::checkPropertyAccess() that a message entity will be passed
+   * in and to this function but without the damn entity. We provide enough
+   * protection around content to just return TRUE in this situation, as what
+   * else can you do? :/ message_access will just return TRUE anyway.
+   */
+  if (!$entity) {
+    return TRUE;
+  }
+
   // Try and find a callback based off of the bundle name.
   $func = '_comstack_message_access__' . $entity->type;
   if (function_exists($func)) {
