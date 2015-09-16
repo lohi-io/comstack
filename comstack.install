@@ -285,7 +285,7 @@ function comstack_uninstall() {
  */
 
 /**
- * Make sure to add in the updated field to the {message} schema.
+ * Make sure to add in our additional fields to the {message} schema.
  */
 function comstack_update_7101() {
   $schema = drupal_get_schema('message');
@@ -293,7 +293,16 @@ function comstack_update_7101() {
   if (!db_field_exists('message', 'updated')) {
     db_add_field('message', 'updated', $schema['fields']['updated']);
   }
+  if (!db_field_exists('message', 'deleted')) {
+    db_add_field('message', 'updated', $schema['fields']['deleted']);
+  }
   if (!db_field_exists('message', 'viewed')) {
     db_add_field('message', 'viewed', $schema['fields']['viewed']);
+  }
+  if (!db_field_exists('message', 'weight')) {
+    db_add_field('message', 'weight', $schema['fields']['weight']);
+  }
+  if (!db_field_exists('message', 'actions')) {
+    db_add_field('message', 'actions', $schema['fields']['actions']);
   }
 }

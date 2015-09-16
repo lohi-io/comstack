@@ -100,12 +100,15 @@ function comstack_ctools_plugin_type() {
 /**
  * Implements hook_ctools_plugin_directory().
  */
-function comstack_ctools_plugin_directory($owner, $plugin_type) {
-  if ($owner == 'comstack' && in_array($plugin_type, array('input_methods', 'ui'))) {
-    return "plugins/$plugin_type";
+function comstack_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'comstack' && in_array($plugin, array('input_methods', 'ui'))) {
+    return "plugins/comstack/$plugin";
   }
-  elseif ($owner == 'entityreference') {
-    return 'plugins/entityreference/' . $plugin_type;
+  elseif ($module == 'entityreference') {
+    return 'plugins/entityreference/' . $plugin;
+  }
+  elseif ($module === 'restful') {
+    return "plugins/restful/$plugin";
   }
 }
 

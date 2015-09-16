@@ -18,3 +18,4 @@ files[] = includes/exceptions/ComstackInvalidParameterException.php
 ; Plugins
 files[] = plugins/entityreference/selection/ComstackRecipientSelectionPlugin.class.php
 ;files[] = plugins/delivery_methods/ComstackDeliveryMethodInterface.php
+files[] = plugins/restful/ComstackRestfulEntityBase.php
