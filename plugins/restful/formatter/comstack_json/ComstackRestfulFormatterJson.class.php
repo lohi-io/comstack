@@ -22,10 +22,9 @@ class ComstackRestfulFormatterJson extends \RestfulFormatterJson {
     );
 
     if (!empty($this->handler)) {
-      $output['paging'] = array();
-
       if (method_exists($this->handler, 'getTotalCount') && method_exists($this->handler, 'isListRequest') && $this->handler->isListRequest()) {
         // Get the total number of items for the current request without pagination.
+        $output['paging'] = array();
         $output['paging']['range'] = $this->handler->getRange();
         $output['paging']['total'] = $this->handler->getTotalCount();
       }
@@ -61,7 +60,12 @@ class ComstackRestfulFormatterJson extends \RestfulFormatterJson {
       );
     }
 
-    $page = !empty($request['page']) ? $request['page'] : 1;
+    // Bail out now if not adding any paging information.
+    if (!isset($data['paging'])) {
+      return;
+    }
+
+    $page = !empty($request['page']) ? intval($request['page']) : 1;
     // If not cursor paging, include the current page.
     if (!isset($data['paging']['cursors'])) {
       $data['paging']['current_page'] = $page;
