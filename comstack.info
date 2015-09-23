@@ -12,6 +12,8 @@ dependencies[] = views
 ; Includes
 files[] = includes/classes/ComstackPluginInterface.php
 files[] = includes/classes/ComstackPluginBase.php
+
+; Exceptions
 files[] = includes/exceptions/ComstackException.php
 files[] = includes/exceptions/ComstackInvalidParameterException.php
 

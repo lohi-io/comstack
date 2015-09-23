@@ -278,6 +278,9 @@ function comstack_uninstall() {
     db_drop_field('message', 'weight');
     db_drop_field('message', 'actions');
   }
+
+  // Remove variables.
+  variable_del('comstack_define_angular_libraries');
 }
 
 /**

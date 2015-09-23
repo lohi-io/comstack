@@ -12,6 +12,7 @@ define('COMSTACK_DENY', 'deny');
 include_once __DIR__ . '/includes/comstack.drush.inc';
 include_once __DIR__ . '/includes/comstack.entity.inc';
 include_once __DIR__ . '/includes/comstack.forms.inc';
+include_once __DIR__ . '/includes/comstack.theme.inc';
 include_once __DIR__ . '/includes/comstack.comstack.inc';
 
 /**
@@ -110,6 +111,86 @@ function comstack_ctools_plugin_directory($module, $plugin) {
   elseif ($module === 'restful') {
     return "plugins/restful/$plugin";
   }
+}
+
+/**
+ * Implements hook_libraries_info().
+ */
+function comstack_libraries_info() {
+  $libraries = array();
+
+  if (variable_get('comstack_define_angular_libraries', TRUE)) {
+    $libraries['angularjs'] = array(
+      'name' => 'AngularJS',
+      'vendor url' => 'https://angularjs.org/',
+      'version arguments' => array(
+        'file' => 'angular.js',
+        'pattern' => '/AngularJS v([0-9.]+)/',
+        'lines' => 3,
+      ),
+      'files' => array(
+        'js' => array('angular.js'),
+      ),
+      'variants' => array(
+        'minified' => array(
+          'files' => array(
+            'js' => array('angular.min.js'),
+          ),
+        ),
+      ),
+    );
+
+    $libraries['ui-router'] = array(
+      'name' => 'ui-router',
+      'vendor url' => 'https://github.com/angular-ui/ui-router',
+      'download url' => 'https://github.com/angular-ui/ui-router/releases',
+      'version arguments' => array(
+        'file' => 'release/angular-ui-router.js',
+        'pattern' => '/version v([0-9.]+)/',
+        'lines' => 3,
+      ),
+      'path' => 'release',
+      'files' => array(
+        'js' => array('angular-ui-router.js'),
+      ),
+      'variants' => array(
+        'minified' => array(
+          'files' => array(
+            'js' => array('angular-ui-router.min.js'),
+          ),
+        ),
+      ),
+      'dependencies' => array(
+        'angularjs (>=1.4.5)',
+      ),
+    );
+
+    $libraries['angular-resource'] = array(
+      'name' => 'angular-resource',
+      'vendor url' => 'https://github.com/angular/bower-angular-resource',
+      'download url' => 'https://github.com/angular/bower-angular-resource/releases',
+      'version arguments' => array(
+        'file' => 'angular-resource.js',
+        'pattern' => '/v([0-9.]+)-build.([0-9]+)/',
+        'lines' => 3,
+      ),
+      'files' => array(
+        'js' => array('angular-resource.js'),
+      ),
+      'variants' => array(
+        'minified' => array(
+          'files' => array(
+            'js' => array('angular-resource.min.js'),
+          ),
+        ),
+      ),
+      'dependencies' => array(
+        'angularjs (>=1.4.5)',
+      ),
+    );
+  }
+
+  return $libraries;
 }
 
 /* Base functions for messing with Comstack ctools plugins. */
