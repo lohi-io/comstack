@@ -80,6 +80,14 @@ class ComstackUsersResource__1_0 extends \RestfulEntityBaseUser {
       'callback' => array('\RestfulManager::echoMessage', array(0)),
     );
 
+    // Add in a link to the users profile.
+    $public_fields['profile'] = array(
+      'callback' => array(
+        array($this, 'profileURL'),
+        array(array()),
+      ),
+    );
+
     // Remove default properties we don't want, yeah self. Discoverable
     // dischmoverable. This will be revisited and done properly at a later
     // date. @todo expand API documentation with HAL self stuff.
@@ -120,5 +128,13 @@ class ComstackUsersResource__1_0 extends \RestfulEntityBaseUser {
     }
 
     return $output;
+  }
+
+  /**
+   * Generate the URL of a users profile.
+   */
+  public function profileURL($wrapper) {
+    $id = $wrapper->getIdentifier();
+    return url("user/$id", array('absolute' => TRUE));
   }
 }
