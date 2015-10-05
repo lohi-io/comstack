@@ -102,10 +102,10 @@ function comstack_ctools_plugin_type() {
  * Implements hook_ctools_plugin_directory().
  */
 function comstack_ctools_plugin_directory($module, $plugin) {
-  if ($module == 'comstack' && in_array($plugin, array('input_methods', 'ui'))) {
+  if ($module === 'comstack' && in_array($plugin, array('input_methods', 'ui'))) {
     return "plugins/comstack/$plugin";
   }
-  elseif ($module == 'entityreference') {
+  elseif ($module === 'entityreference') {
     return 'plugins/entityreference/' . $plugin;
   }
   elseif ($module === 'restful') {
@@ -191,6 +191,18 @@ function comstack_libraries_info() {
   }
 
   return $libraries;
+}
+
+/**
+ * Implements hook_js_alter().
+ */
+function comstack_js_alter(&$javascript) {
+  $angular_path = libraries_get_path('angularjs') . '/angular.js';
+
+  if (isset($javascript[$angular_path])) {
+    $javascript[$angular_path]['group'] = -200;
+    $javascript[$angular_path]['weight'] = -200;
+  }
 }
 
 /* Base functions for messing with Comstack ctools plugins. */
