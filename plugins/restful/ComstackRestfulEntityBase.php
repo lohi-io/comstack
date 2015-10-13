@@ -57,6 +57,36 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
   }
 
   /**
+   * Return the direction we're meant to be paging in to be used with queries.
+   */
+  public function getPagingDirection() {
+    $request = $this->getRequest();
+    $after = isset($request['after']) && ctype_digit((string) $request['after']) ? $request['after'] : NULL;
+    $before = isset($request['before']) && ctype_digit((string) $request['before']) ? $request['before'] : NULL;
+
+    return !$after && $before ? 'ASC' : 'DESC';
+  }
+
+  /**
+   * Overrides \RestfulDataProviderEFQ::queryForListSort().
+   */
+  protected function queryForListSort(\EntityFieldQuery $query) {
+    if (!$this->cursor_paging) {
+      parent::queryForListSort($query);
+    }
+    else {
+      // Cursor crazy stuff here we go.
+      // Ignore any sort instructions from controllers in favour of entity ID.
+      // The sort direction by default will be DESC descending unless the
+      // "before" query string is present, in which case we're going backwards
+      // and the sort order should be ascending.
+
+      // Hard code to "id", entity id...
+      $query->entityOrderBy('entity_id', $this->getPagingDirection());
+    }
+  }
+
+  /**
    * Overrides \RestfulDataProviderEFQ::queryForListPagination().
    */
   protected function queryForListPagination(\EntityFieldQuery $query) {
@@ -72,11 +102,15 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
       $after = isset($request['after']) && ctype_digit((string) $request['after']) ? $request['after'] : NULL;
       $before = isset($request['before']) && ctype_digit((string) $request['before']) ? $request['before'] : NULL;
 
+      $operator = $this->getPagingDirection() === 'DESC' ? '<' : '>';
+
+      // You can only have the one, before or after, if after is present then
+      // go with that.
       if ($after) {
-        $query->entityCondition('entity_id', $after, '>');
+        $query->entityCondition('entity_id', $after, $operator);
       }
-      if ($before) {
-        $query->entityCondition('entity_id', $before, '<');
+      if (!$after && $before) {
+        $query->entityCondition('entity_id', $before, $operator);
       }
 
       // Add limit from range.
@@ -177,8 +211,14 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
       $this->setHttpHeaders('Status', 204);
     }
 
-    // Throw in pagination data.
+    // Deal with cursor pagination data.
     if ($this->cursor_paging && !empty($ids)) {
+      // Reverse the data set, weird I know.
+      if ($this->getPagingDirection() === 'ASC') {
+        $ids = array_reverse($ids);
+        $return = array_reverse($return);
+      }
+
       $first_id = $ids[0];
       $last_id = $ids[count($ids) - 1];
 
@@ -195,6 +235,8 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
         ),
         'previous' => NULL,
         'next' => NULL,
+        'range' => $this->getRange(),
+        'total' => $this->getTotalCount(),
       );
 
       // Provide a "Previous" paging link if we're not on the first page.
