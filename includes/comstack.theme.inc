@@ -19,6 +19,7 @@ function comstack_theme() {
       'url' => NULL,
       'controller' => NULL,
       'ui_view' => NULL,
+      'apply_scroll' => FALSE,
     ),
   );
 
@@ -37,5 +38,9 @@ function template_preprocess_comstack_angular(&$variables) {
   }
   if (isset($variables['controller'])) {
     $variables['attributes_array']['ng-controller'] = check_plain($variables['controller']);
+  }
+  $variables['ui_view_attributes'] = array();
+  if ($variables['apply_scroll']) {
+    $variables['ui_view_attributes']['autoscroll'] = 'true';
   }
 }
