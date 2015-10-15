@@ -235,8 +235,8 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
         ),
         'previous' => NULL,
         'next' => NULL,
-        'range' => $this->getRange(),
-        'total' => $this->getTotalCount(),
+        'range' => intval($this->getRange()),
+        'total' => intval($this->getTotalCount()),
       );
 
       // Provide a "Previous" paging link if we're not on the first page.
@@ -409,6 +409,37 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
     }
     $url .= '/' . $plugin['resource'] . '/' . $path;
     return url(rtrim($url, '/'), $options);
+  }
+
+  /**
+   * Return the maximum range that the endpoint will allow, if one isn't set
+   * then return the default range.
+   */
+  public function getMaxRange() {
+    return !empty($this->max_range) ? $this->max_range : $this->getRange();
+  }
+
+  /**
+   * Overrides \RestfulBase::overrideRange().
+   *
+   * Allow exposed range to be set higher than the default.
+   */
+  protected function overrideRange() {
+    $request = $this->getRequest();
+    if (!empty($request['range'])) {
+      $url_params = $this->getPluginKey('url_params');
+      if (!$url_params['range']) {
+        throw new \RestfulBadRequestException('The range parameter has been disabled in server configuration.');
+      }
+
+      if (!ctype_digit((string) $request['range']) || $request['range'] < 1) {
+        throw new \RestfulBadRequestException('"Range" property should be numeric and higher than 0.');
+      }
+      if ($request['range'] <= $this->getMaxRange()) {
+        // If there is a valid range property in the request override the range.
+        $this->setRange($request['range']);
+      }
+    }
   }
 
   /**
