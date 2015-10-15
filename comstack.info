@@ -2,7 +2,7 @@ name = Communications Stack (comstack)
 description = Provides an API for communications.
 core = 7.x
 package = Communications Stack
-php = 5.3
+php = 5.4
 
 dependencies[] = ctools
 dependencies[] = entity
