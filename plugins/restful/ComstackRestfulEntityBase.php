@@ -486,8 +486,22 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
     static::cleanRequest($request);
 
     // Make sure any text values are trimmed first.
+    $strip_non_utf8 = variable_get('comstack_apis_strip_non_utf8', TRUE);
+    $use_mb = function_exists('mb_check_encoding');
+
     foreach ($request as $k => $v) {
       if (is_string($v)) {
+        if ($strip_non_utf8) {
+          // Check for non utf8 characters.
+          // http://stackoverflow.com/questions/1523460/ensuring-valid-utf-8-in-php
+          if ($use_mb && mb_check_encoding($v, 'UTF-8') || !$use_mb && max(array_map('ord', str_split($v))) >= 240) {
+            // Remove em.
+            $v = preg_replace_callback('/./u', function (array $match) {
+              return strlen($match[0]) >= 4 ? null : $match[0];
+            }, $v);
+          }
+        }
+
         $request[$k] = trim($v);
       }
     }
