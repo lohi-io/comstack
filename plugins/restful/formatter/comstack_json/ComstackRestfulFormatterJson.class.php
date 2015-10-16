@@ -25,8 +25,8 @@ class ComstackRestfulFormatterJson extends \RestfulFormatterJson {
       if (method_exists($this->handler, 'getTotalCount') && method_exists($this->handler, 'isListRequest') && $this->handler->isListRequest()) {
         // Get the total number of items for the current request without pagination.
         $output['paging'] = array();
-        $output['paging']['range'] = $this->handler->getRange();
-        $output['paging']['total'] = $this->handler->getTotalCount();
+        $output['paging']['range'] = intval($this->handler->getRange());
+        $output['paging']['total'] = intval($this->handler->getTotalCount());
       }
 
       if (method_exists($this->handler, 'additionalHateoas')) {
