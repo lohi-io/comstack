@@ -16,6 +16,7 @@ files[] = includes/classes/ComstackPluginBase.php
 ; Exceptions
 files[] = includes/exceptions/ComstackException.php
 files[] = includes/exceptions/ComstackInvalidParameterException.php
+files[] = includes/exceptions/ComstackUnavailableUserException.php
 
 ; Plugins
 files[] = plugins/entityreference/selection/ComstackRecipientSelectionPlugin.class.php
