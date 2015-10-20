@@ -142,7 +142,12 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
     );
 
     if (!$entity = entity_load_single($entity_type, $entity_id)) {
-      throw new RestfulNotFoundException(format_string('The entity ID @id for @resource does not exist.', $params));
+      if (!$this->isListRequest()) {
+        throw new RestfulNotFoundException(format_string('The entity ID @id for @resource does not exist.', $params));
+      }
+      else {
+        return FALSE;
+      }
     }
 
     list(,, $bundle) = entity_extract_ids($entity_type, $entity);
