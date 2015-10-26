@@ -197,11 +197,13 @@ function comstack_libraries_info() {
  * Implements hook_js_alter().
  */
 function comstack_js_alter(&$javascript) {
-  $angular_path = libraries_get_path('angularjs') . '/angular.js';
+  if (variable_get('comstack_define_angular_libraries', TRUE)) {
+    $angular_path = libraries_get_path('angularjs') . '/angular.js';
 
-  if (isset($javascript[$angular_path])) {
-    $javascript[$angular_path]['group'] = -200;
-    $javascript[$angular_path]['weight'] = -200;
+    if (isset($javascript[$angular_path])) {
+      $javascript[$angular_path]['group'] = -200;
+      $javascript[$angular_path]['weight'] = -200;
+    }
   }
 }
 
