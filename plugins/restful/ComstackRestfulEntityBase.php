@@ -119,6 +119,79 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
   }
 
   /**
+   * Overrides \RestfulEntityBase::parseRequestForListFilter().
+   *
+   * Change the default conjunction to "OR" instead of "AND".
+   */
+  protected function parseRequestForListFilter() {
+    if (!$this->isListRequest()) {
+      // Not a list request, so we don't need to filter.
+      // We explicitly check this, as this function might be called from a
+      // formatter plugin, after RESTful's error handling has finished, and an
+      // invalid key might be passed.
+      return array();
+    }
+    $request = $this->getRequest();
+    if (empty($request['filter'])) {
+      // No filtering is needed.
+      return array();
+    }
+    $url_params = $this->getPluginKey('url_params');
+    if (!$url_params['filter']) {
+      throw new \RestfulBadRequestException('Filter parameters have been disabled in server configuration.');
+    }
+
+    $filters = array();
+    $public_fields = $this->getPublicFields();
+
+    foreach ($request['filter'] as $public_field => $value) {
+      if (empty($public_fields[$public_field])) {
+        throw new RestfulBadRequestException(format_string('The filter @filter is not allowed for this path.', array('@filter' => $public_field)));
+      }
+
+      // Filtering can be achieved in different ways:
+      //   1. filter[foo]=bar
+      //   2. filter[foo][0]=bar&filter[foo][1]=baz
+      //   3. filter[foo][value]=bar
+      //   4. filter[foo][value][0]=bar&filter[foo][value][1]=baz
+      if (!is_array($value)) {
+        // Request uses the shorthand form for filter. For example
+        // filter[foo]=bar would be converted to filter[foo][value] = bar.
+        $value = array('value' => $value);
+      }
+      if (!is_array($value['value'])) {
+        $value['value'] = array($value['value']);
+      }
+      // Add the property
+      $value['public_field'] = $public_field;
+
+      // Set default operator.
+      $value += array('operator' => array_fill(0, count($value['value']), '='));
+      if (!is_array($value['operator'])) {
+        $value['operator'] = array($value['operator']);
+      }
+
+      // Make sure that we have the same amount of operators than values.
+      if (!in_array(strtoupper($value['operator'][0]), array('IN', 'BETWEEN')) && count($value['value']) != count($value['operator'])) {
+        throw new RestfulBadRequestException('The number of operators and values has to be the same.');
+      }
+
+      $value += array('conjunction' => 'OR');
+
+      // Clean the operator in case it came from the URL.
+      // e.g. filter[minor_version][operator]=">="
+      $value['operator'] = str_replace(array('"', "'"), '', $value['operator']);
+
+      static::isValidOperatorsForFilter($value['operator']);
+      static::isValidConjunctionForFilter($value['conjunction']);
+
+      $filters[] = $value;
+    }
+
+    return $filters;
+  }
+
+  /**
    * Determine if an entity is valid, and accessible.
    *
    * @param $op
