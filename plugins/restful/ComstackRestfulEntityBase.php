@@ -280,7 +280,7 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
    * to hard force the PHP var type so when json_encode goes near it the output
    * is correct.
    */
-  public function viewEntity($id) {
+  public function viewEntity($id, $entity = NULL) {
     $entity_id = $this->getEntityIdByFieldId($id);
     $request = $this->getRequest();
 
@@ -293,7 +293,7 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
       return;
     }
 
-    $wrapper = entity_metadata_wrapper($this->entityType, $entity_id);
+    $wrapper = $entity ? entity_metadata_wrapper($this->entityType, $entity) : entity_metadata_wrapper($this->entityType, $entity_id);
     $wrapper->language($this->getLangCode());
     $values = array();
 
