@@ -43,4 +43,7 @@ function template_preprocess_comstack_angular(&$variables) {
   if ($variables['apply_scroll']) {
     $variables['ui_view_attributes']['autoscroll'] = 'true';
   }
+  if ($variables['apply_idle']) {
+    $variables['ui_view_attributes']['idle'] = NULL;
+  }
 }
