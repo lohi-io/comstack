@@ -141,7 +141,7 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
       '@resource' => $this->getPluginKey('label'),
     );
 
-    if (!$entity = entity_load_single($entity_type, $entity_id)) {
+    if (!$entity = $this->loadEntities($entity_id)) {
       if (!$this->isListRequest()) {
         throw new RestfulNotFoundException(format_string('The entity ID @id for @resource does not exist.', $params));
       }
@@ -174,6 +174,26 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
   }
 
   /**
+   *  Pre load entities or an entity for either a list or view_entity().
+   */
+  public function loadEntities($ids) {
+    $entity_type = $this->entityType;
+
+    if (is_array($ids)) {
+      $return = entity_load($entity_type, $ids);
+    }
+    elseif (is_numeric($ids)) {
+      $return = entity_load_single($entity_type, $ids);
+    }
+
+    /**
+     * Love this next line, could've been $entities but am enjoying the
+     * redundancy.
+     */
+    return $return ? $return : NULL;
+  }
+
+  /**
    * Overrides \RestfulEntityBase::getList().
    */
   public function getList() {
@@ -198,6 +218,7 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
     // Pre-load all entities if there is no render cache.
     $cache_info = $this->getPluginKey('render_cache');
     if (!$cache_info['render']) {
+      $this->loadEntities($ids);
       entity_load($entity_type, $ids);
     }
 
@@ -293,7 +314,8 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
       return;
     }
 
-    $wrapper = $entity ? entity_metadata_wrapper($this->entityType, $entity) : entity_metadata_wrapper($this->entityType, $entity_id);
+    $entity = $entity ? $entity : $this->loadEntities($entity_id);
+    $wrapper = entity_metadata_wrapper($this->entityType, $entity);
     $wrapper->language($this->getLangCode());
     $values = array();
 
