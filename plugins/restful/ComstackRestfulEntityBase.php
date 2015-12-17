@@ -382,7 +382,7 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
         }
       }
 
-      if ($value && $info['process_callbacks']) {
+      if ($info['process_callbacks']) {
         foreach ($info['process_callbacks'] as $process_callback) {
           $value = static::executeCallback($process_callback, array($value));
         }
