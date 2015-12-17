@@ -5,7 +5,39 @@
  * Contains ComstackUsersResource__1_0.
  */
 
-class ComstackUsersResource__1_0 extends \RestfulEntityBaseUser {
+class ComstackUsersResource__1_0 extends \ComstackRestfulEntityBase {
+  /**
+   * Overrides parent::getEntityInfo().
+   */
+  public function getEntityInfo($type = NULL) {
+    $info = parent::getEntityInfo($type);
+    $info['entity keys']['label'] = 'name';
+    return $info;
+  }
+
+  /**
+   * Overrides \RestfulEntityBase::getList().
+   *
+   * Make sure only privileged users may see a list of users.
+   */
+  public function getList() {
+    $account = $this->getAccount();
+    if (!user_access('administer users', $account) && !user_access('access user profiles', $account)) {
+      throw new \RestfulForbiddenException('You do not have access to listing of users.');
+    }
+    return parent::getList();
+  }
+  /**
+   * Overrides \RestfulEntityBase::getQueryForList().
+   *
+   * Skip the anonymous user in listing.
+   */
+  public function getQueryForList() {
+    $query = parent::getQueryForList();
+    $query->entityCondition('entity_id', 0, '>');
+    return $query;
+  }
+
   /**
    * Overrides \RestfulDataProviderEFQ::controllersInfo().
    */
@@ -110,15 +142,33 @@ class ComstackUsersResource__1_0 extends \RestfulEntityBaseUser {
    *   A cleaned image array.
    */
   public function userPictureProcess($file, array $image_styles) {
-    // If there's no image to process, bail out.
-    if (!is_object($file) || !$file || empty($image_styles)) {
+    // If we don't any image styles we're not going to have much luck.
+    if (empty($image_styles)) {
+      return;
+    }
+
+    // If we have a valid image URI use it, else try to use the default.
+    $default_avatar = variable_get('user_picture_default', '');
+    if ((!is_object($file) || !$file) && $default_avatar) {
+      $uri = $default_avatar;
+    }
+    // Valid file.
+    else if ($file && isset($file->uri)) {
+      $uri = $file->uri;
+    }
+    // Special consideration for letter_default_avatar module.
+    //else if (module_exists('letter_default_avatar')) {
+
+    //}
+    // Nothing to do here.
+    else {
       return;
     }
 
     // Loop through the image styles.
     $output = array();
     foreach ($image_styles as $style) {
-      $url = image_style_url($style, $file->uri);
+      $url = image_style_url($style, $uri);
 
       if ($url) {
         // Replace "comstack-" with nothing from the image style name.
