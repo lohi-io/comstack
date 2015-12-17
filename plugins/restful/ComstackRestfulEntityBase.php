@@ -219,7 +219,6 @@ abstract class ComstackRestfulEntityBase extends \RestfulEntityBase {
     $cache_info = $this->getPluginKey('render_cache');
     if (!$cache_info['render']) {
       $this->loadEntities($ids);
-      entity_load($entity_type, $ids);
     }
 
     $return = array();
