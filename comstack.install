@@ -282,6 +282,7 @@ function comstack_uninstall() {
   // Remove variables.
   variable_del('comstack_define_angular_libraries');
   variable_del('comstack_apis_strip_non_utf8');
+  variable_del('comstack_mass_update_batch_threshold');
 }
 
 /**
