@@ -84,6 +84,21 @@ function comstack_entity_property_info_alter(&$info) {
     'schema field' => 'weight',
     'type' => 'integer',
   );
+
+  // If the picture property doesn't exist on the user entity then add it.
+  // This issue has a patch to correct the problem.
+  // https://www.drupal.org/node/2224645#comment-10161298
+  // This module will only take care of "view".
+  if (!isset($info['user']['properties']['picture'])) {
+    $info['user']['properties']['picture'] = array(
+      'label' => t('Picture'),
+      'description' => t("The user's picture."),
+      'type' => 'file',
+      'access callback' => 'comstack_user_access_picture_property',
+      'getter callback' => 'comstack_user_get_picture_property',
+      'schema field' => 'picture',
+    );
+  }
 }
 
 /**
@@ -174,4 +189,72 @@ function _comstack_message_access($op, $entity, $account = NULL, $entity_type = 
   }
 
   return message_access($op, $entity, $account, $entity_type);
+}
+
+/**
+ * Access callback for the picture property.
+ */
+function comstack_user_access_picture_property($op, $property, $entity = NULL, $account = NULL) {
+  if ($op === 'view') {
+    return TRUE;
+  }
+}
+
+/**
+ * Picture property get callback.
+ */
+function comstack_user_get_picture_property($account, array $options, $name, $entity_type) {
+  // Check for an image object and load a default if one exists.
+  if (empty($account->picture)) {
+    $account->picture = comstack_user_get_default_picture();
+  }
+
+  return empty($account->picture) ? NULL : $account->picture;
+}
+
+/**
+ * Return a file object for a default avatar or NULL of one doesn't exist.
+ */
+function comstack_user_get_default_picture() {
+  static $_comstack_user_default_picture;
+
+  if (!isset($_comstack_user_default_picture)) {
+    $default_avatar_path = variable_get('user_picture_default', '');
+    $_comstack_user_default_picture = NULL;
+
+    if ($default_avatar_path && file_valid_uri($default_avatar_path)) {
+      $files = file_load_multiple(array(), array('uri' => $default_avatar_path));
+
+      if ($files) {
+        $_comstack_user_default_picture = reset($files);
+      }
+    }
+  }
+
+  return $_comstack_user_default_picture;
+}
+
+/**
+ * Implements hook_user_load().
+ *
+ * Force load a full user picture file object for anyone without an avatar if
+ * user default picture is set. This avoids entity_metadata_wrapper issues.
+ */
+function comstack_user_load($users) {
+  $default_avatar_path = variable_get('user_picture_default', '');
+
+  if ($default_avatar_path && file_valid_uri($default_avatar_path)) {
+    $default_avatar = comstack_user_get_default_picture();
+
+    if (!$default_avatar) {
+      return;
+    }
+
+    foreach ($users as $uid => $user) {
+      // Only act for users without an avatar.
+      if (!$user->picture) {
+        $users[$uid]->picture = $default_avatar;
+      }
+    }
+  }
 }
