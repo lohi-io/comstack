@@ -299,7 +299,7 @@ function comstack_update_7101() {
     db_add_field('message', 'updated', $schema['fields']['updated']);
   }
   if (!db_field_exists('message', 'deleted')) {
-    db_add_field('message', 'updated', $schema['fields']['deleted']);
+    db_add_field('message', 'deleted', $schema['fields']['deleted']);
   }
   if (!db_field_exists('message', 'viewed')) {
     db_add_field('message', 'viewed', $schema['fields']['viewed']);
